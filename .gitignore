@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Vite / test caches
+.vite/
+coverage/
+.vitest/
+
+# Local databases and journals
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs and debug output
+*.log
+*.out
+npm-debug.log*
+/tmp/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Native addons
+*.exe
+*.dll
+*.so
+*.dylib
+
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
