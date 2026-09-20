@@ -1,6 +1,6 @@
 # Steamer
 
-Compare and write OpenBao KV secrets across environments. Adapted from [`bao-helper`](/Users/luca/repos/bao-helper). Compare and Write are one **Secrets** page. Every write and every settings save asks for confirmation.
+Compare and write OpenBao KV secrets across environments. Compare and Write are one **Secrets** page. Every write and every settings save asks for confirmation.
 
 UI: `/steamer/secrets`, `/steamer/settings`.
 
@@ -20,8 +20,6 @@ The host binds `127.0.0.1` only. Tokens live under `~/.config/batbelt/steamer/to
 | --- | --- |
 | `~/.config/batbelt/steamer/config.yaml` | Environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment tokens (`0600`) |
-
-The original bao-helper app still uses `~/.config/bao-helper/`. Copy that YAML by hand if you want the same environments.
 
 ```yaml
 environments:
