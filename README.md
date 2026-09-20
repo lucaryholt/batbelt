@@ -1,16 +1,17 @@
 # batbelt
 
-Localhost toolbox with a shared UI shell. First modules:
+Localhost toolbox with a shared UI shell. Modules:
 
 - **Kubefwd** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
 - **Steamer** — OpenBao KV compare + write on one page, with confirmation before every write
+- **Kickflip** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 
 The server binds to `127.0.0.1` only.
 
 ## Requirements
 
 - Node.js 20+
-- [`kubectl`](https://kubernetes.io/docs/tasks/tools/) on your `PATH` for Kubefwd
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/) on your `PATH` for Kubefwd and Kickflip
 - The [`bao`](https://openbao.org/docs/commands/) CLI on your `PATH` for Steamer
 - OIDC already enabled on each OpenBao instance, with `http://localhost:8250/oidc/callback` allowed as a redirect URI
 
@@ -55,6 +56,7 @@ An empty SQLite database is valid. Explore and Add Service populate it.
 | `~/.config/batbelt/kubefwd.db` | Kubefwd services and settings |
 | `~/.config/batbelt/steamer/config.yaml` | Steamer environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment OpenBao tokens (`0600`) |
+| `~/.config/batbelt/kickflip/config.yaml` | Kickflip contexts, namespaces, and services |
 
 The original kubefwd and bao-helper apps keep their own files. To bring an existing kubefwd YAML across:
 
@@ -73,3 +75,23 @@ Pages: Services, Proxy, Port Checker, Explore. Add/edit/remove is persisted in S
 Pages: Secrets, Settings. Secrets combines compare and write: browse a path, load values, edit the key×env grid, then confirm a summary before `bao kv put`. Settings save also asks for confirmation. Login and logout stay one-click.
 
 OIDC still uses port `8250` for the `bao` callback.
+
+### Kickflip
+
+Page: Services. First start writes a seed YAML from the old `secret-service-restarter` script (gowish namespaces and the default GKE context). Edit the file on disk, then **Reload config**. The UI does not write the YAML.
+
+Tick services, **Select all** / per-namespace select, pick a context, then **Restart** or **Secrets + restart**. Every run asks for confirmation. Kickflip streams `kubectl` output and does not wait for rollout status.
+
+```yaml
+contexts:
+  - name: dev
+    context: gke_gowish-devx_europe-west1_api-eu
+    default: true
+namespaces:
+  - name: personalization-service
+    services:
+      - name: brands
+      # optional: external_secret, deployment
+```
+
+Default ExternalSecret is `{name}-env`. Default deployment is `{name}`.

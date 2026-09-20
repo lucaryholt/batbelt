@@ -8,6 +8,7 @@ import type { ModuleContext } from "./modules/types.js";
 import { createHostApp } from "./server/index.js";
 import { kubefwdModule } from "./modules/kubefwd/index.js";
 import { steamerModule } from "./modules/steamer/index.js";
+import { kickflipModule } from "./modules/kickflip/index.js";
 
 async function main(): Promise<void> {
   const program = new Command();
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
 
   registerModule(kubefwdModule);
   registerModule(steamerModule);
+  registerModule(kickflipModule);
 
   for (const mod of getModules()) {
     await mod.start?.(ctx);

@@ -5,6 +5,7 @@ import { useToast } from "./toast";
 import type { ModuleDescriptor } from "./types";
 import { KubefwdApp } from "../modules/kubefwd/App";
 import { SteamerApp } from "../modules/steamer/App";
+import { KickflipApp } from "../modules/kickflip/App";
 
 export function App() {
   const [modules, setModules] = useState<ModuleDescriptor[]>([]);
@@ -61,6 +62,7 @@ export function App() {
           />
           <Route path="/kubefwd/*" element={<KubefwdApp />} />
           <Route path="/steamer/*" element={<SteamerApp />} />
+          <Route path="/kickflip/*" element={<KickflipApp />} />
         </Routes>
       </div>
       {toast && <div className={`toast${toast.error ? " error" : ""}`}>{toast.msg}</div>}

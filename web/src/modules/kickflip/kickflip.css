@@ -1,0 +1,172 @@
+.kickflip-app {
+  --kf-raised: #161b22;
+  --kf-sunken: #0d1117;
+  --kf-line: #30363d;
+  --kf-ok: var(--green);
+  --kf-bad: var(--red);
+  --kf-warn: var(--amber);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.kickflip-app main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.kickflip-app header .st-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--kf-line);
+  background: var(--kf-raised);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+.kickflip-app .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.kickflip-app .dot.ok { background: var(--kf-ok); }
+.kickflip-app .dot.bad { background: var(--kf-bad); }
+.kickflip-app .stack > * + * { margin-top: 16px; }
+.kickflip-app .card {
+  background: var(--kf-raised);
+  border: 1px solid var(--kf-line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.kickflip-app .row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.kickflip-app .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  flex: 1;
+}
+.kickflip-app .field.narrow { flex: 0 0 280px; }
+.kickflip-app .btn {
+  border: 1px solid var(--kf-line);
+  background: var(--kf-sunken);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+}
+.kickflip-app .btn:hover:not(:disabled) { border-color: var(--accent); }
+.kickflip-app .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.kickflip-app .btn.primary {
+  background: rgba(88, 166, 255, 0.15);
+  border-color: rgba(88, 166, 255, 0.4);
+  color: var(--accent);
+}
+.kickflip-app .btn.small { padding: 3px 8px; font-size: 11px; }
+.kickflip-app .banner {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.kickflip-app .banner.warn { background: rgba(210, 153, 34, 0.12); color: var(--kf-warn); }
+.kickflip-app .banner.bad { background: rgba(248, 81, 73, 0.12); color: var(--kf-bad); }
+.kickflip-app .banner.ok { background: rgba(63, 185, 80, 0.12); color: var(--kf-ok); }
+.kickflip-app .log {
+  background: var(--kf-sunken);
+  border: 1px solid var(--kf-line);
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.kickflip-app .env-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.kickflip-app .actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.kickflip-app .service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.kickflip-app .service-tile {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  min-height: 68px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--kf-sunken);
+  border: 1px solid var(--kf-line);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  white-space: normal;
+  line-height: 1.3;
+}
+.kickflip-app .service-tile:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+.kickflip-app .service-tile.selected {
+  background: rgba(88, 166, 255, 0.16);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.35);
+  color: var(--accent);
+}
+.kickflip-app .service-tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.kickflip-app .service-tile-mark {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--accent);
+}
+.kickflip-app .service-tile-name {
+  word-break: break-word;
+}
+.kickflip-app .confirm-list {
+  margin: 12px 0;
+  padding-left: 18px;
+}
+.kickflip-app .confirm-list li { margin: 4px 0; }
+.kickflip-app select,
+.kickflip-app input[type="text"] {
+  background: var(--kf-sunken);
+  color: var(--text);
+  border: 1px solid var(--kf-line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 12px;
+}
