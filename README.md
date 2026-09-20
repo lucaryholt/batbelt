@@ -2,9 +2,9 @@
 
 Localhost toolbox with a shared UI shell. Modules:
 
-- **Kubefwd** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
-- **Steamer** — OpenBao KV compare + write on one page, with confirmation before every write
-- **Kickflip** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
+- **[Kubefwd](src/modules/kubefwd/README.md)** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
+- **[Steamer](src/modules/steamer/README.md)** — OpenBao KV compare + write on one page, with confirmation before every write
+- **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 
 The server binds to `127.0.0.1` only.
 
@@ -66,32 +66,6 @@ npx tsx src/cli.ts --import-yaml ~/.kubefwd.yaml
 
 ## Modules
 
-### Kubefwd
-
-Pages: Services, Proxy, Port Checker, Explore. Add/edit/remove is persisted in SQLite. Cluster context comes from the imported YAML or from Explore when you add services.
-
-### Steamer
-
-Pages: Secrets, Settings. Secrets combines compare and write: browse a path, load values, edit the key×env grid, then confirm a summary before `bao kv put`. Settings save also asks for confirmation. Login and logout stay one-click.
-
-OIDC still uses port `8250` for the `bao` callback.
-
-### Kickflip
-
-Page: Services. First start writes a seed YAML from the old `secret-service-restarter` script (gowish namespaces and the default GKE context). Edit the file on disk, then **Reload config**. The UI does not write the YAML.
-
-Tick services, **Select all** / per-namespace select, pick a context, then **Restart** or **Secrets + restart**. Every run asks for confirmation. Kickflip streams `kubectl` output and does not wait for rollout status.
-
-```yaml
-contexts:
-  - name: dev
-    context: gke_gowish-devx_europe-west1_api-eu
-    default: true
-namespaces:
-  - name: personalization-service
-    services:
-      - name: brands
-      # optional: external_secret, deployment
-```
-
-Default ExternalSecret is `{name}-env`. Default deployment is `{name}`.
+- [Kubefwd](src/modules/kubefwd/README.md) — Services, Proxy, Port Checker, Explore. SQLite only; YAML is `--import-yaml`.
+- [Steamer](src/modules/steamer/README.md) — Secrets + Settings. Confirm every write and settings save. OIDC callback on port `8250`.
+- [Kickflip](src/modules/kickflip/README.md) — Services tile grid. File-only YAML; first start seeds the old restarter lists.
