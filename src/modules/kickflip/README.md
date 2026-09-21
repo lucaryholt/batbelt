@@ -1,6 +1,6 @@
 # Kickflip
 
-Tick YAML-configured Deployments, then annotate ExternalSecrets and/or `rollout restart`. Replaces [`secret-service-restarter`](/Users/luca/scripts/secret-service-restarter).
+Tick YAML-configured Deployments, then annotate ExternalSecrets and/or `rollout restart`.
 
 UI: `/kickflip/services`.
 
@@ -63,12 +63,3 @@ namespaces:
 ```
 
 Exactly one context should set `default: true`. If none do, the first context is used.
-
-### Seeded services
-
-| Namespace | Services |
-| --- | --- |
-| `personalization-service` | brands, creators, activity, partners, product-updates, products, reactions, recommendations, wish-genie |
-| `activation-service` | audiences, cards, followers, notifications, occasions, sharing, tracking, users |
-| `wishing-experience` | search, wishlists |
-| `graphql-gateway` | gateway (`gateway-env`) |

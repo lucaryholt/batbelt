@@ -1,6 +1,6 @@
 # Kubefwd
 
-Kubernetes port-forwards and GCP proxy connections. Adapted from [`/Users/luca/scripts/kubefwd`](/Users/luca/scripts/kubefwd).
+Kubernetes port-forwards and GCP proxy connections.
 
 UI: `/kubefwd/services`, `/kubefwd/proxy`, `/kubefwd/ports`, `/kubefwd/explore`.
 
