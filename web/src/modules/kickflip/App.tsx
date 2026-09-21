@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { getConfig, getHealth } from "./api";
+import { getConfig, getHealth, openConfig } from "./api";
 import { ServicesPage } from "./pages/Services";
 import type { ConfigResponse, HealthResponse } from "./types";
+import { useToast } from "../../shell/toast";
 import "./kickflip.css";
 
 export function KickflipApp() {
@@ -10,6 +11,7 @@ export function KickflipApp() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const { flash } = useToast();
 
   const refresh = useCallback(async () => {
     const [nextConfig, nextHealth] = await Promise.all([getConfig(), getHealth()]);
@@ -28,6 +30,16 @@ export function KickflipApp() {
     <div className="kickflip-app">
       <header>
         <span className="logo">kickflip</span>
+        <button
+          className="btn small"
+          onClick={() => {
+            void openConfig()
+              .then((res) => flash(`Opened ${res.path}`))
+              .catch((err: Error) => flash(err.message, true));
+          }}
+        >
+          Open YAML
+        </button>
         {health && (
           <span className="st-pill">
             <span className={`dot ${health.kubectlAvailable ? "ok" : "bad"}`} />

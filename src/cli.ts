@@ -6,6 +6,7 @@ import { DEFAULT_PORT, defaultDbPath, ensureConfigDir } from "./paths.js";
 import { getModules, registerModule } from "./modules/registry.js";
 import type { ModuleContext } from "./modules/types.js";
 import { createHostApp } from "./server/index.js";
+import { homepageModule } from "./modules/homepage/index.js";
 import { kubefwdModule } from "./modules/kubefwd/index.js";
 import { steamerModule } from "./modules/steamer/index.js";
 import { kickflipModule } from "./modules/kickflip/index.js";
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
     startDefaultProxies: !!opts.defaultProxy,
   };
 
+  registerModule(homepageModule);
   registerModule(kubefwdModule);
   registerModule(steamerModule);
   registerModule(kickflipModule);

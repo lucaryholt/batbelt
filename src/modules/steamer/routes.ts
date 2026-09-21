@@ -1,4 +1,4 @@
-import { unlink } from "node:fs/promises";
+import { access, unlink } from "node:fs/promises";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type {
@@ -21,7 +21,8 @@ import {
   tokenLookup,
 } from "./bao.js";
 import { findEnvironment, loadConfig, saveConfig } from "./config.js";
-import { tokenPath } from "./paths.js";
+import { configFilePath, tokenPath } from "./paths.js";
+import { openInCode } from "../../open-in-code.js";
 
 const loginLocks = new Set<string>();
 
@@ -58,6 +59,21 @@ export function createRoutes(): Hono {
       return c.json(saved);
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400);
+    }
+  });
+
+  app.post("/config/open", async (c) => {
+    try {
+      await loadConfig();
+      try {
+        await access(configFilePath());
+      } catch {
+        await saveConfig({ environments: [] });
+      }
+      const result = await openInCode(configFilePath());
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500);
     }
   });
 

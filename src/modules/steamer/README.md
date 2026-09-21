@@ -21,6 +21,8 @@ The host binds `127.0.0.1` only. Tokens live under `~/.config/batbelt/steamer/to
 | `~/.config/batbelt/steamer/config.yaml` | Environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment tokens (`0600`) |
 
+**Open YAML** runs `code` on the config file (needs the Cursor/VS Code `code` shell command on `PATH`).
+
 The original bao-helper app still uses `~/.config/bao-helper/`. Copy that YAML by hand if you want the same environments.
 
 ```yaml
@@ -40,9 +42,10 @@ environments:
 1. Pick KV mount and path
 2. **Browse paths** to see which keys exist in which environment
 3. **Load existing secret** from one environment or all
-4. Edit the key × environment grid (values hidden until revealed)
-5. Tick which environments to write
-6. Confirm the summary (create vs overwrite, key list), then `bao kv put`
+4. Use **Search** to filter browse-path names and key-grid rows (case-insensitive). Hidden values are not searched. Writes still include every key.
+5. Edit the key × environment grid (values hidden until revealed)
+6. Tick which environments to write
+7. Confirm the summary (create vs overwrite, key list), then `bao kv put`
 
 The server rejects writes without `confirm: true`, including first-time creates.
 

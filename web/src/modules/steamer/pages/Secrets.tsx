@@ -56,9 +56,15 @@ export function SecretsPage({
   const [revealAll, setRevealAll] = useState(false);
   const [loginLogs, setLoginLogs] = useState<string[]>([]);
   const [loginCurrent, setLoginCurrent] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const loggedOut = status.filter((env) => !env.loggedIn);
   const loggingIn = loginCurrent !== null;
+  const needle = query.trim().toLowerCase();
+  const visibleIndexes = keys
+    .map((key, index) => ({ key, index }))
+    .filter(({ key }) => !needle || key.toLowerCase().includes(needle))
+    .map(({ index }) => index);
 
   function setKeyName(index: number, name: string) {
     const previous = keys[index];
@@ -332,6 +338,15 @@ export function SecretsPage({
             </label>
           ))}
         </div>
+        <label className="field" style={{ marginTop: 16 }}>
+          Search
+          <input
+            className="mono"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter paths and key names"
+          />
+        </label>
       </section>
 
       {listResults && (
@@ -339,6 +354,7 @@ export function SecretsPage({
           envs={envs}
           path={path}
           results={listResults}
+          query={query}
           onOpenFolder={(next) => void runBrowseAt(next)}
           onOpenSecret={(next) => void pickSecret(next)}
         />
@@ -360,7 +376,8 @@ export function SecretsPage({
             </tr>
           </thead>
           <tbody>
-            {keys.map((key, index) => {
+            {visibleIndexes.map((index) => {
+              const key = keys[index];
               const open = revealAll || revealed[key] || !key;
               const rowDiff = key.trim() !== "" && valuesDiffer(values, key, envs.map((env) => env.name));
               return (
@@ -409,6 +426,11 @@ export function SecretsPage({
             })}
           </tbody>
         </table>
+        {keys.length > 0 && visibleIndexes.length === 0 && (
+          <p className="muted" style={{ marginTop: 12 }}>
+            No keys match “{query.trim()}”. Writes still include every key.
+          </p>
+        )}
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn" onClick={() => setKeys((current) => [...current, ""])}>
             Add key

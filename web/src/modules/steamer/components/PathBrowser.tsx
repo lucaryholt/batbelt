@@ -5,16 +5,22 @@ export function PathBrowser({
   envs,
   path,
   results,
+  query = "",
   onOpenFolder,
   onOpenSecret,
 }: {
   envs: Environment[];
   path: string;
   results: Record<string, EnvResult<string[]>>;
+  query?: string;
   onOpenFolder: (nextPath: string) => void;
   onOpenSecret: (nextPath: string) => void;
 }) {
-  const entries = listedPaths(results);
+  const allEntries = listedPaths(results);
+  const needle = query.trim().toLowerCase();
+  const entries = needle
+    ? allEntries.filter((entry) => entry.toLowerCase().includes(needle))
+    : allEntries;
   const errors = envErrors(results);
 
   return (
@@ -60,7 +66,10 @@ export function PathBrowser({
           {errors.join(" · ")}
         </div>
       )}
-      {entries.length === 0 && errors.length === 0 && <p className="muted">Nothing listed at this prefix.</p>}
+      {allEntries.length === 0 && errors.length === 0 && <p className="muted">Nothing listed at this prefix.</p>}
+      {allEntries.length > 0 && entries.length === 0 && (
+        <p className="muted">No paths match “{query.trim()}”.</p>
+      )}
     </section>
   );
 }

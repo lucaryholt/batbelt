@@ -35,6 +35,14 @@ export async function saveConfig(config: AppConfig): Promise<AppConfig> {
   );
 }
 
+export async function openConfig(): Promise<{ path: string }> {
+  return parseJson(
+    await fetch("/api/steamer/config/open", {
+      method: "POST",
+    }),
+  );
+}
+
 export async function getStatus(): Promise<{ environments: EnvStatus[] }> {
   return parseJson(await fetch("/api/steamer/status"));
 }

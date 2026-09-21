@@ -15,6 +15,8 @@ UI: `/kickflip/services`.
 
 First start writes a seed from the old script (gowish namespaces + default GKE context). Later starts do **not** overwrite that file. Edit on disk, then **Reload config**. The UI never writes the YAML.
 
+**Open YAML** runs `code` on that file (needs the Cursor/VS Code `code` shell command on `PATH`).
+
 ## Page
 
 Click a service tile to select it. **Select all**, **Unselect all**, and per-namespace select work as well.

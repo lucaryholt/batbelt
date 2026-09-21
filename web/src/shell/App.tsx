@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { hostApi } from "./api";
 import { useToast } from "./toast";
 import type { ModuleDescriptor } from "./types";
+import { HomepageApp } from "../modules/homepage/App";
 import { KubefwdApp } from "../modules/kubefwd/App";
 import { SteamerApp } from "../modules/steamer/App";
 import { KickflipApp } from "../modules/kickflip/App";
@@ -60,6 +61,7 @@ export function App() {
             path="/"
             element={first ? <Navigate to={`/${first.id}/${first.pages[0]?.path ?? ""}`} replace /> : <p className="muted">Loading…</p>}
           />
+          <Route path="/homepage/*" element={<HomepageApp />} />
           <Route path="/kubefwd/*" element={<KubefwdApp />} />
           <Route path="/steamer/*" element={<SteamerApp />} />
           <Route path="/kickflip/*" element={<KickflipApp />} />

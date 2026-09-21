@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { runKickflip } from "../api";
+import { openConfig, runKickflip } from "../api";
 import type { ConfigResponse, RunMode, RunServiceRef } from "../types";
 
 function keyOf(namespace: string, name: string): string {
@@ -139,6 +139,17 @@ export function ServicesPage({
           </button>
           <button className="btn small" disabled={busy} onClick={() => setSelected([])}>
             Unselect all
+          </button>
+          <button
+            className="btn small"
+            disabled={busy}
+            onClick={() => {
+              void openConfig()
+                .then((res) => setMessage(`Opened ${res.path}`))
+                .catch((err: Error) => setError(err.message));
+            }}
+          >
+            Open YAML
           </button>
           <button
             className="btn small"

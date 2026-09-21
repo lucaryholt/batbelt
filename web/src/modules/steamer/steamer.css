@@ -16,6 +16,7 @@
   overflow-y: auto;
   padding: 20px;
 }
+.steamer-app header .btn { flex-shrink: 0; }
 .steamer-app header .st-env-pills {
   margin-left: auto;
   display: flex;

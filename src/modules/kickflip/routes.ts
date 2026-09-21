@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { defaultContext, findContext, findService, loadConfig } from "./config.js";
+import { defaultContext, findContext, findService, loadConfig, writeSeedIfMissing } from "./config.js";
 import { annotateExternalSecretArgs, kubectlHealth, rolloutRestartArgs, runKubectl } from "./kubectl.js";
+import { configFilePath } from "./paths.js";
+import { openInCode } from "../../open-in-code.js";
 import type {
   ConfigResponse,
   HealthResponse,
@@ -51,6 +53,16 @@ export function createRoutes(deps: KickflipDeps = {}): Hono {
       return c.json(body);
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400);
+    }
+  });
+
+  app.post("/config/open", async (c) => {
+    try {
+      await writeSeedIfMissing();
+      const result = await openInCode(configFilePath());
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500);
     }
   });
 

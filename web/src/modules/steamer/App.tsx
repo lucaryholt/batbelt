@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { AppConfig, EnvStatus, HealthResponse } from "./types";
-import { getConfig, getHealth, getStatus } from "./api";
+import { getConfig, getHealth, getStatus, openConfig } from "./api";
 import { SecretsPage } from "./pages/Secrets";
 import { SettingsPage } from "./pages/Settings";
+import { useToast } from "../../shell/toast";
 import "./steamer.css";
 
 export function SteamerApp() {
@@ -11,6 +12,7 @@ export function SteamerApp() {
   const [status, setStatus] = useState<EnvStatus[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [ready, setReady] = useState(false);
+  const { flash } = useToast();
 
   const refresh = useCallback(async () => {
     const [nextConfig, nextStatus, nextHealth] = await Promise.all([
@@ -35,6 +37,16 @@ export function SteamerApp() {
     <div className="steamer-app">
       <header>
         <span className="logo">steamer</span>
+        <button
+          className="btn small"
+          onClick={() => {
+            void openConfig()
+              .then((res) => flash(`Opened ${res.path}`))
+              .catch((err: Error) => flash(err.message, true));
+          }}
+        >
+          Open YAML
+        </button>
         {health && !health.baoAvailable && <span className="muted">bao CLI not found on PATH</span>}
         <div className="st-env-pills">
           {status.map((env) => (

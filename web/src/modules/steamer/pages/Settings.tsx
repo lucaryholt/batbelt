@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AppConfig, Environment, EnvStatus, HealthResponse } from "../types";
-import { loginEnv, logoutEnv, saveConfig } from "../api";
+import { loginEnv, logoutEnv, openConfig, saveConfig } from "../api";
 
 const blankEnv = (): Environment => ({
   name: "",
@@ -106,6 +106,18 @@ export function SettingsPage({
         Config is stored at <code>~/.config/batbelt/steamer/config.yaml</code>. Tokens stay in{" "}
         <code>~/.config/batbelt/steamer/tokens/</code> so they never overwrite <code>~/.vault-token</code>.
       </p>
+      <div className="actions">
+        <button
+          className="btn small"
+          onClick={() => {
+            void openConfig()
+              .then((res) => setMessage(`Opened ${res.path}`))
+              .catch((err: Error) => setError(err.message));
+          }}
+        >
+          Open YAML
+        </button>
+      </div>
       {draft.map((env, index) => {
         const live = statusByName.get(env.name);
         return (

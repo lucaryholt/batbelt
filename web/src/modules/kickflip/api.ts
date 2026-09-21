@@ -16,6 +16,14 @@ export async function getConfig(): Promise<ConfigResponse> {
   return parseJson(await fetch("/api/kickflip/config"));
 }
 
+export async function openConfig(): Promise<{ path: string }> {
+  return parseJson(
+    await fetch("/api/kickflip/config/open", {
+      method: "POST",
+    }),
+  );
+}
+
 export async function reloadConfig(): Promise<ConfigResponse> {
   return parseJson(
     await fetch("/api/kickflip/config/reload", {

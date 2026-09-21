@@ -2,6 +2,7 @@
 
 Localhost toolbox with a shared UI shell. Modules:
 
+- **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of shortcuts, plus a starred row above them
 - **[Kubefwd](src/modules/kubefwd/README.md)** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
 - **[Steamer](src/modules/steamer/README.md)** — OpenBao KV compare + write on one page, with confirmation before every write
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
@@ -53,6 +54,7 @@ An empty SQLite database is valid. Explore and Add Service populate it.
 
 | Path | Contents |
 | --- | --- |
+| `~/.config/batbelt/homepage/config.yaml` | Homepage sections and shortcuts |
 | `~/.config/batbelt/kubefwd.db` | Kubefwd services and settings |
 | `~/.config/batbelt/steamer/config.yaml` | Steamer environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment OpenBao tokens (`0600`) |
@@ -66,6 +68,7 @@ npx tsx src/cli.ts --import-yaml ~/.kubefwd.yaml
 
 ## Modules
 
+- [Homepage](src/modules/homepage/README.md) — Links board with a starred row of pinned shortcuts. YAML + UI CRUD; confirm deletes only.
 - [Kubefwd](src/modules/kubefwd/README.md) — Services, Proxy, Port Checker, Explore. SQLite only; YAML is `--import-yaml`.
-- [Steamer](src/modules/steamer/README.md) — Secrets + Settings. Confirm every write and settings save. OIDC callback on port `8250`.
+- [Steamer](src/modules/steamer/README.md) — Secrets + Settings. Confirm every write and settings save. OIDC callback on port `8250`. Search filters browse paths and key names.
 - [Kickflip](src/modules/kickflip/README.md) — Services tile grid. File-only YAML; first start seeds the old restarter lists.
