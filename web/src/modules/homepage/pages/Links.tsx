@@ -1,5 +1,14 @@
-import { forwardRef, useImperativeHandle, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { saveConfig } from "../api";
+import { buildMatcher, nextTileId, normalizeQuery, type NavDirection } from "../filter";
 import type { HomepageConfig, Section, Shortcut } from "../types";
 
 function newId(): string {
@@ -38,6 +47,12 @@ function StarIcon({ filled }: { filled?: boolean }) {
       />
     </svg>
   );
+}
+
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 function starredIds(config: HomepageConfig): string[] {
@@ -106,17 +121,31 @@ function ShortcutTile({
   shortcut,
   starred,
   locked,
+  selected,
+  tileRef,
   onEdit,
   onStar,
+  onOpen,
 }: {
   shortcut: Shortcut;
   starred: boolean;
   locked: boolean;
+  selected?: boolean;
+  tileRef?: (el: HTMLAnchorElement | null) => void;
   onEdit: () => void;
   onStar: () => void;
+  onOpen: () => void;
 }) {
   return (
-    <a className="shortcut-tile" href={shortcut.url} target="_blank" rel="noopener noreferrer">
+    <a
+      ref={tileRef}
+      className={`shortcut-tile${selected ? " selected" : ""}`}
+      href={shortcut.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-selected={selected}
+      onClick={onOpen}
+    >
       <div className="shortcut-tile-head">
         <span className="shortcut-label">{shortcut.label}</span>
         <div className="shortcut-tile-actions">
@@ -162,6 +191,17 @@ export const LinksPage = forwardRef<
   const [shortcutLabel, setShortcutLabel] = useState("");
   const [shortcutUrl, setShortcutUrl] = useState("");
   const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const tileRefs = useRef(new Map<string, HTMLAnchorElement>());
+  const navIdsRef = useRef<string[]>([]);
+  const queryRef = useRef(query);
+  const selectedIdRef = useRef(selectedId);
+  const modalOpenRef = useRef(false);
+  queryRef.current = query;
+  selectedIdRef.current = selectedId;
+  modalOpenRef.current = modal !== null;
 
   async function persist(next: HomepageConfig, lockId?: string) {
     setSaving(lockId ?? "all");
@@ -339,13 +379,173 @@ export const LinksPage = forwardRef<
     );
   }
 
-  const starredHits = resolveStarred(config);
-  const pinned = new Set(starredHits.map((hit) => hit.shortcut.id));
+  const q = normalizeQuery(query);
+  const matches = buildMatcher(config.sections, query);
+  const allStarred = resolveStarred(config);
+  const pinned = new Set(allStarred.map((hit) => hit.shortcut.id));
+  const starredHits = allStarred.filter((hit) => matches(hit.shortcut, hit.section));
+  const visibleSections = config.sections
+    .map((section) => ({
+      section,
+      shortcuts: section.shortcuts.filter((shortcut) => matches(shortcut, section)),
+      expanded: q !== "" || !section.collapsed,
+    }))
+    .filter((entry) => q === "" || entry.shortcuts.length > 0);
+  const noMatches = q !== "" && starredHits.length === 0 && visibleSections.length === 0;
+
+  /** Keyboard order visits each shortcut once: starred hits first, then the rest. */
+  const navIds: string[] = [];
+  const navSeen = new Set<string>();
+  for (const hit of starredHits) {
+    if (navSeen.has(hit.shortcut.id)) continue;
+    navSeen.add(hit.shortcut.id);
+    navIds.push(hit.shortcut.id);
+  }
+  for (const entry of visibleSections) {
+    if (!entry.expanded) continue;
+    for (const shortcut of entry.shortcuts) {
+      if (navSeen.has(shortcut.id)) continue;
+      navSeen.add(shortcut.id);
+      navIds.push(shortcut.id);
+    }
+  }
+  navIdsRef.current = navIds;
+  const navStarred = new Set(starredHits.map((hit) => hit.shortcut.id));
+
+  function registerTile(id: string) {
+    return (el: HTMLAnchorElement | null) => {
+      if (el) tileRefs.current.set(id, el);
+      else tileRefs.current.delete(id);
+    };
+  }
+
+  function resetFilter() {
+    setQuery("");
+    setSelectedId(null);
+  }
+
+  const navKey = navIds.join("|");
+  useEffect(() => {
+    setSelectedId((current) =>
+      current && navIdsRef.current.includes(current) ? current : null,
+    );
+  }, [navKey]);
+
+  useEffect(() => {
+    setSelectedId(q === "" ? null : (navIdsRef.current[0] ?? null));
+  }, [q]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    tileRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selectedId]);
+
+  function moveSelection(direction: NavDirection) {
+    const ids = navIdsRef.current;
+    if (ids.length === 0) return;
+    const current = selectedIdRef.current;
+    if (!current || !ids.includes(current)) {
+      setSelectedId(ids[0]);
+      return;
+    }
+    const tiles = ids.flatMap((id) => {
+      const el = tileRefs.current.get(id);
+      if (!el) return [];
+      const rect = el.getBoundingClientRect();
+      return [{ id, top: rect.top, left: rect.left }];
+    });
+    setSelectedId(nextTileId(tiles, current, direction));
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (modalOpenRef.current || event.isComposing) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const inFilter = event.target === filterRef.current;
+      if (!inFilter && isEditable(event.target)) return;
+
+      const arrows: Record<string, NavDirection> = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+      };
+      const direction = arrows[event.key];
+      if (direction) {
+        event.preventDefault();
+        moveSelection(direction);
+        return;
+      }
+
+      // A focused link or button activates itself on Enter/Space; don't double up.
+      const onControl =
+        event.target instanceof HTMLElement && event.target.closest("a, button") !== null;
+      if (onControl && (event.key === "Enter" || event.key === " ")) return;
+
+      if (event.key === "Enter") {
+        const current = selectedIdRef.current;
+        const tile = current ? tileRefs.current.get(current) : undefined;
+        if (tile) {
+          event.preventDefault();
+          tile.click();
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (queryRef.current !== "") {
+          event.preventDefault();
+          setQuery("");
+        }
+        return;
+      }
+      if (inFilter) return;
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        setQuery((current) => current.slice(0, -1));
+        filterRef.current?.focus();
+        return;
+      }
+      if (event.key.length !== 1) return;
+      if (event.key === " " && queryRef.current === "") return;
+      event.preventDefault();
+      setQuery((current) => current + event.key);
+      filterRef.current?.focus();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    function clearWhenDismissed() {
+      if (document.hidden) resetFilter();
+    }
+    function onWindowBlur() {
+      resetFilter();
+    }
+    document.addEventListener("visibilitychange", clearWhenDismissed);
+    window.addEventListener("pagehide", resetFilter);
+    window.addEventListener("blur", onWindowBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", clearWhenDismissed);
+      window.removeEventListener("pagehide", resetFilter);
+      window.removeEventListener("blur", onWindowBlur);
+    };
+  }, []);
 
   return (
     <div className="stack">
       {message && <div className="banner ok">{message}</div>}
       {error && <div className="banner bad">{error}</div>}
+
+      <input
+        ref={filterRef}
+        className="shortcut-filter"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Filter shortcuts — just start typing"
+        aria-label="Filter shortcuts"
+      />
 
       {starredHits.length > 0 && (
         <div className="starred-block">
@@ -356,9 +556,12 @@ export const LinksPage = forwardRef<
                 key={shortcut.id}
                 shortcut={shortcut}
                 starred
+                selected={selectedId === shortcut.id}
+                tileRef={registerTile(shortcut.id)}
                 locked={saving === section.id || saving === "all" || saving === "starred"}
                 onEdit={() => openShortcut(section.id, shortcut)}
                 onStar={() => void toggleStar(shortcut.id)}
+                onOpen={resetFilter}
               />
             ))}
           </div>
@@ -371,13 +574,21 @@ export const LinksPage = forwardRef<
         </section>
       )}
 
-      {config.sections.map((section) => {
+      {noMatches && (
+        <section className="card">
+          <p>
+            No shortcuts match <strong>{query.trim()}</strong>.
+          </p>
+        </section>
+      )}
+
+      {visibleSections.map(({ section, shortcuts, expanded }) => {
         const locked = saving === section.id || saving === "all" || saving === "starred";
         return (
           <section
             className="card section-card"
             key={section.id}
-            aria-expanded={!section.collapsed}
+            aria-expanded={expanded}
             onClick={() => {
               if (!locked) void toggleCollapsed(section);
             }}
@@ -385,7 +596,7 @@ export const LinksPage = forwardRef<
             <div className="env-card-head">
               <div className="section-toggle">
                 <span className="chevron" aria-hidden>
-                  {section.collapsed ? "▸" : "▾"}
+                  {expanded ? "▾" : "▸"}
                 </span>
                 {section.logo && !brokenLogos[section.id] ? (
                   <img
@@ -397,7 +608,7 @@ export const LinksPage = forwardRef<
                 ) : null}
                 <strong>{section.title}</strong>
                 <span className="muted">
-                  {section.shortcuts.length} shortcut{section.shortcuts.length === 1 ? "" : "s"}
+                  {shortcuts.length} shortcut{shortcuts.length === 1 ? "" : "s"}
                 </span>
               </div>
               <div className="section-card-actions">
@@ -411,16 +622,19 @@ export const LinksPage = forwardRef<
                 <IconButton label={`Edit ${section.title}`} disabled={locked} onClick={() => openSection(section)} />
               </div>
             </div>
-            {!section.collapsed && (
+            {expanded && (
               <div className="shortcut-grid" onClick={stop}>
-                {section.shortcuts.map((shortcut) => (
+                {shortcuts.map((shortcut) => (
                   <ShortcutTile
                     key={shortcut.id}
                     shortcut={shortcut}
                     starred={pinned.has(shortcut.id)}
+                    selected={!navStarred.has(shortcut.id) && selectedId === shortcut.id}
+                    tileRef={navStarred.has(shortcut.id) ? undefined : registerTile(shortcut.id)}
                     locked={locked}
                     onEdit={() => openShortcut(section.id, shortcut)}
                     onStar={() => void toggleStar(shortcut.id)}
+                    onOpen={resetFilter}
                   />
                 ))}
               </div>

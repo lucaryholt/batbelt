@@ -41,3 +41,13 @@ sections:
 - **+** next to a section pencil adds a shortcut
 - Add, edit, and star save immediately
 - Broken logo URLs are hidden; the title stays
+
+## Keyboard
+
+- Just start typing anywhere on the page to filter — no need to click the filter box first. Modal fields and modifier chords (⌘/⌃/⌥) are left alone
+- Each whitespace-separated token must appear in the shortcut's label or section title, so `argo` surfaces the whole Argo section and `argo dev` keeps only its DEV shortcut
+- URLs are searched only when nothing matches on names, so a host like `argo.stg.gwos.dev` does not make every environment a hit for `dev`. Queries such as `dags` or `github` still find shortcuts by URL
+- While filtering, sections without a match are hidden and collapsed sections show their matches. Clearing the filter restores the saved `collapsed` state — filtering never writes to the YAML
+- Arrow keys move the highlight across the grid as it looks on screen. A starred shortcut is only visited in the **Starred** row; its copy inside the section is skipped
+- **Enter** opens the highlighted shortcut in a new tab, **Backspace** deletes the last character, **Escape** clears the filter
+- Opening a shortcut, hiding the window, or switching away clears the filter so the next search starts empty

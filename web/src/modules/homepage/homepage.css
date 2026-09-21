@@ -157,6 +157,19 @@
   border-color: var(--accent);
   background: rgba(88, 166, 255, 0.08);
 }
+.homepage-app .shortcut-tile.selected {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.14);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.homepage-app .shortcut-filter {
+  width: 100%;
+  padding: 8px 10px;
+}
+.homepage-app .shortcut-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .homepage-app .starred-block {
   padding: 0 2px 4px;
 }
