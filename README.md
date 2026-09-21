@@ -68,10 +68,12 @@ It deliberately uses the same `node` your shell resolves, because `better-sqlite
 
 | Control | Action |
 | --- | --- |
-| Menu bar icon (left click) | Toggle the popover |
+| Menu bar icon (left click) | Toggle the popover (top centre of the active screen) |
+| Menu bar icon (right click) | Open the tray menu |
 | Tray **Open** | Same toggle |
-| ⌘⇧B | Same toggle |
+| ⌘⌥⇧B | Same toggle |
 | **Pop out** (tray menu) | Same window, title bar, resizable, Dock icon |
+| Popover edge | Resize the attached window (minimum 480×400) |
 | Window close | Return to menu bar (does not quit) |
 | **Quit** (tray menu) | Stop the Node server the app spawned and exit |
 | **Open in browser** | Open the localhost UI in your browser |

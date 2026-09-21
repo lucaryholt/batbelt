@@ -9,12 +9,11 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::NewWindowResponse;
 use tauri::{
-    ActivationPolicy, AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    ActivationPolicy, AppHandle, Manager, PhysicalPosition, RunEvent, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
-use tauri_plugin_positioner::{Position, WindowExt};
 
 /// Menu bar artwork, derived from icons/icon.png with the white knockout
 /// removed so the alpha channel carries the logo. A template image is drawn
@@ -25,6 +24,9 @@ const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
 const WINDOW_LABEL: &str = "main";
 const POPOVER_W: f64 = 760.0;
 const POPOVER_H: f64 = 640.0;
+const POPOVER_TOP_MARGIN: f64 = 8.0;
+const POPOVER_MIN_W: f64 = 480.0;
+const POPOVER_MIN_H: f64 = 400.0;
 const PORT_MIN: u16 = 3870;
 const PORT_MAX: u16 = 3879;
 
@@ -239,12 +241,32 @@ fn mark_ignore_blur(app: &AppHandle) {
     }
 }
 
+/// Anchors the popover to the top centre of the active screen, just under the
+/// menu bar, regardless of where the tray icon sits.
+fn position_top_center(win: &WebviewWindow) {
+    let monitor = match win.current_monitor() {
+        Ok(Some(monitor)) => monitor,
+        _ => match win.primary_monitor() {
+            Ok(Some(monitor)) => monitor,
+            _ => return,
+        },
+    };
+    let Ok(size) = win.outer_size() else {
+        return;
+    };
+    let area = monitor.work_area();
+    let margin = (POPOVER_TOP_MARGIN * monitor.scale_factor()).round() as i32;
+    let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
+    let y = area.position.y + margin;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
 fn show_attached_popover(app: &AppHandle) {
     let Some(win) = main_window(app) else {
         return;
     };
     mark_ignore_blur(app);
-    let _ = win.as_ref().window().move_window(Position::TrayBottomRight);
+    position_top_center(&win);
     let _ = win.show();
     let _ = win.set_focus();
 }
@@ -310,7 +332,7 @@ fn return_to_menubar(app: &AppHandle) {
         st.attached = true;
         st.ignore_blur_until = Instant::now() + Duration::from_millis(450);
     }
-    let _ = win.set_resizable(false);
+    let _ = win.set_resizable(true);
     let _ = win.set_decorations(false);
     let _ = win.set_always_on_top(true);
     let _ = win.set_skip_taskbar(true);
@@ -469,9 +491,10 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::App("index.html".into()))
         .title("batbelt")
         .inner_size(POPOVER_W, POPOVER_H)
+        .min_inner_size(POPOVER_MIN_W, POPOVER_MIN_H)
         .visible(false)
         .decorations(false)
-        .resizable(false)
+        .resizable(true)
         .skip_taskbar(true)
         .always_on_top(true)
         .shadow(true)
@@ -498,10 +521,12 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyB);
+    let shortcut = Shortcut::new(
+        Some(Modifiers::SUPER | Modifiers::ALT | Modifiers::SHIFT),
+        Code::KeyB,
+    );
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
@@ -531,7 +556,6 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| handle_menu(app, event.id.as_ref()))
                 .on_tray_icon_event(|tray, event| {
-                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
@@ -567,6 +591,11 @@ pub fn run() {
                 return;
             }
             match event {
+                WindowEvent::Resized(_) => {
+                    if is_attached(window.app_handle()) {
+                        mark_ignore_blur(window.app_handle());
+                    }
+                }
                 WindowEvent::Focused(false) => {
                     let app = window.app_handle();
                     if !is_attached(app) {
