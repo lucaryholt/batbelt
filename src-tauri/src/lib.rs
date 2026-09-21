@@ -16,6 +16,12 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt};
 
+/// Menu bar artwork, derived from icons/icon.png with the white knockout
+/// removed so the alpha channel carries the logo. A template image is drawn
+/// from alpha alone, so the bundle icon (whose alpha is a filled oval) renders
+/// as a solid blob.
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
+
 const WINDOW_LABEL: &str = "main";
 const POPOVER_W: f64 = 760.0;
 const POPOVER_H: f64 = 640.0;
@@ -521,6 +527,7 @@ pub fn run() {
             let menu = build_menu(app.handle())?;
             let mut tray = TrayIconBuilder::with_id("tray")
                 .menu(&menu)
+                .icon_as_template(true)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| handle_menu(app, event.id.as_ref()))
                 .on_tray_icon_event(|tray, event| {
@@ -534,8 +541,14 @@ pub fn run() {
                         toggle_popover(tray.app_handle());
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
+            match tauri::image::Image::from_bytes(TRAY_ICON) {
+                Ok(icon) => tray = tray.icon(icon),
+                Err(err) => {
+                    log_line(&format!("tray icon: {err}"));
+                    if let Some(icon) = app.default_window_icon() {
+                        tray = tray.icon(icon.clone());
+                    }
+                }
             }
             tray.build(app)?;
 
