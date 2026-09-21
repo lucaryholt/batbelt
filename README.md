@@ -64,6 +64,8 @@ npm run desktop        # production `.app` + DMG under `src-tauri/target/release
 
 The wrapper starts `node dist/cli.js` with your login-shell `PATH` (so `kubectl`, `bao`, and `code` still work). If something is already healthy on `127.0.0.1:3870`–`3879`, it attaches instead of spawning a second server. Set `BATBELT_HOME` to override the repo path.
 
+It deliberately uses the same `node` your shell resolves, because `better-sqlite3` is a native module tied to one Node major version. After switching Node versions with `nvm`, run `npm rebuild better-sqlite3`. Launcher and server output goes to `~/Library/Logs/batbelt-desktop.log`.
+
 | Control | Action |
 | --- | --- |
 | Menu bar icon (left click) | Toggle the popover |

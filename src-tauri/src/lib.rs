@@ -40,6 +40,52 @@ impl DesktopState {
     }
 }
 
+fn log_path() -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    let dir = PathBuf::from(home).join("Library").join("Logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir.join("batbelt-desktop.log"))
+}
+
+fn open_log() -> Option<std::fs::File> {
+    let path = log_path()?;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .ok()
+}
+
+fn log_line(msg: &str) {
+    eprintln!("batbelt: {msg}");
+    if let Some(mut file) = open_log() {
+        let _ = writeln!(file, "{msg}");
+    }
+}
+
+fn set_status(app: &AppHandle, text: &str) {
+    let Some(win) = main_window(app) else {
+        return;
+    };
+    let payload = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_string());
+    let js = format!(
+        "(function(){{var el=document.getElementById('status');if(el)el.textContent={payload};}})()"
+    );
+    let _ = win.eval(&js);
+}
+
+/// Surfaces a launcher failure in the splash window; stderr is invisible when
+/// the bundle is started from Finder.
+fn report_failure(app: &AppHandle, msg: String) {
+    log_line(&msg);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(600));
+        set_status(&app, &msg);
+        show_attached_popover(&app);
+    });
+}
+
 fn login_shell_path() -> String {
     let from_shell = Command::new("zsh")
         .args(["-ilc", "printenv PATH"])
@@ -50,32 +96,50 @@ fn login_shell_path() -> String {
         .filter(|s| !s.is_empty());
     let mut path = from_shell.unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
 
+    // Fallbacks for GUI launches that start with a bare PATH. These are
+    // appended, never prepended: the login shell's own node must win, or
+    // native modules such as better-sqlite3 are loaded by a Node version they
+    // were not compiled against.
     let mut extras: Vec<String> = vec![
         "/opt/homebrew/bin".into(),
         "/usr/local/bin".into(),
         "/usr/bin".into(),
     ];
     if let Ok(home) = std::env::var("HOME") {
-        let nvm = PathBuf::from(&home).join(".nvm/versions/node");
-        if let Ok(entries) = std::fs::read_dir(&nvm) {
-            let mut bins: Vec<PathBuf> = entries
-                .filter_map(|e| e.ok())
-                .map(|e| e.path().join("bin"))
-                .filter(|p| p.is_dir())
-                .collect();
-            bins.sort();
-            if let Some(latest) = bins.last() {
-                extras.insert(0, latest.to_string_lossy().into_owned());
-            }
+        if let Some(bin) = newest_nvm_bin(&home) {
+            extras.push(bin.to_string_lossy().into_owned());
         }
     }
 
     for extra in extras {
         if Path::new(&extra).is_dir() && !path.split(':').any(|p| p == extra) {
-            path = format!("{extra}:{path}");
+            path = format!("{path}:{extra}");
         }
     }
     path
+}
+
+fn newest_nvm_bin(home: &str) -> Option<PathBuf> {
+    let nvm = PathBuf::from(home).join(".nvm/versions/node");
+    let mut versions: Vec<(Vec<u32>, PathBuf)> = std::fs::read_dir(nvm)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let bin = entry.path().join("bin");
+            if !bin.is_dir() {
+                return None;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let parts = name
+                .trim_start_matches('v')
+                .split('.')
+                .map(|part| part.parse::<u32>().unwrap_or(0))
+                .collect();
+            Some((parts, bin))
+        })
+        .collect();
+    versions.sort();
+    versions.pop().map(|(_, bin)| bin)
 }
 
 fn which_in_path(name: &str, path: &str) -> Option<PathBuf> {
@@ -275,6 +339,7 @@ fn stop_child(app: &AppHandle) {
 
 fn spawn_server(app: &AppHandle) -> Result<u16, String> {
     if let Some(port) = find_running_port() {
+        log_line(&format!("attaching to existing server on port {port}"));
         return Ok(port);
     }
     let path = login_shell_path();
@@ -299,6 +364,13 @@ fn spawn_server(app: &AppHandle) -> Result<u16, String> {
         })
         .ok_or_else(|| "No free port in 3870–3879".to_string())?;
 
+    log_line(&format!(
+        "starting {} {} --port {port} (cwd {})",
+        node.display(),
+        cli.display(),
+        root.display()
+    ));
+
     let mut cmd = Command::new(&node);
     cmd.arg(&cli)
         .arg("--port")
@@ -308,8 +380,8 @@ fn spawn_server(app: &AppHandle) -> Result<u16, String> {
         .env("DEV", "0")
         .current_dir(&root)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
+        .stdout(open_log().map(Stdio::from).unwrap_or_else(Stdio::null))
+        .stderr(open_log().map(Stdio::from).unwrap_or_else(Stdio::null));
     let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to start node {}: {e}", node.display()))?;
@@ -333,11 +405,35 @@ fn wait_and_navigate(app: AppHandle, port: u16) {
                         let _ = win.navigate(parsed);
                     }
                 }
+                log_line(&format!("serving {url}"));
                 return;
             }
+
+            let exited = {
+                let state = app.state::<Mutex<DesktopState>>();
+                let status = match state.lock() {
+                    Ok(mut guard) => guard
+                        .child
+                        .as_mut()
+                        .and_then(|child| child.try_wait().ok().flatten()),
+                    Err(_) => None,
+                };
+                status
+            };
+            if let Some(status) = exited {
+                report_failure(
+                    &app,
+                    format!("The batbelt server exited ({status}). See ~/Library/Logs/batbelt-desktop.log"),
+                );
+                return;
+            }
+
             std::thread::sleep(Duration::from_millis(200));
         }
-        eprintln!("batbelt did not become healthy on port {port}");
+        report_failure(
+            &app,
+            format!("The batbelt server never became healthy on port {port}. See ~/Library/Logs/batbelt-desktop.log"),
+        );
     });
 }
 
@@ -449,7 +545,7 @@ pub fn run() {
 
             match spawn_server(app.handle()) {
                 Ok(port) => wait_and_navigate(app.handle().clone(), port),
-                Err(err) => eprintln!("batbelt server: {err}"),
+                Err(err) => report_failure(app.handle(), err),
             }
             Ok(())
         })
