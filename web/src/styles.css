@@ -40,10 +40,12 @@ body {
 }
 .bb-brand {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   padding: 0 8px;
 }
+.bb-brand-mark { width: 32px; height: 32px; flex: none; object-fit: contain; }
+.bb-brand-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bb-brand strong { font-size: 16px; color: var(--accent); letter-spacing: 0.4px; }
 .bb-brand span { font-size: 11px; color: var(--muted); }
 nav.bb-nav {
@@ -61,7 +63,8 @@ nav.bb-nav {
   border-radius: 6px;
   padding: 6px 8px;
 }
-.bb-nav-mod { font-weight: 600; color: var(--text); }
+.bb-nav-mod { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; color: var(--text); }
+.bb-nav-key { font-size: 10px; font-weight: 400; color: var(--muted); }
 .bb-nav-mod.active, .bb-nav-page.active { color: var(--accent); background: rgba(88, 166, 255, 0.08); }
 .bb-nav-page { padding-left: 16px; font-size: 12px; }
 .bb-nav-mod:hover, .bb-nav-page:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }

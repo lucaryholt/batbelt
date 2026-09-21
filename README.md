@@ -7,6 +7,8 @@ Localhost toolbox with a shared UI shell. Modules:
 - **[Steamer](src/modules/steamer/README.md)** — OpenBao KV compare + write on one page, with confirmation before every write
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 
+⌃1–⌃4 jump to the modules in sidebar order, in the browser and the menu bar app alike.
+
 The server binds to `127.0.0.1` only.
 
 ## Requirements

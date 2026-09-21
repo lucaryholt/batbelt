@@ -22,8 +22,8 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
 
 const WINDOW_LABEL: &str = "main";
-const POPOVER_W: f64 = 760.0;
-const POPOVER_H: f64 = 640.0;
+const POPOVER_W: f64 = 1080.0;
+const POPOVER_H: f64 = 800.0;
 const POPOVER_TOP_MARGIN: f64 = 8.0;
 const POPOVER_MIN_W: f64 = 480.0;
 const POPOVER_MIN_H: f64 = 400.0;
