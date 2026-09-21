@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const url = `http://127.0.0.1:${port}`;
   process.stdout.write(`batbelt running at ${url}\n`);
 
-  if (ctx.open) {
+  if (ctx.open && process.env.BATBELT_DESKTOP !== "1") {
     try {
       await open(url);
     } catch {

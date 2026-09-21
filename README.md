@@ -50,6 +50,32 @@ batbelt [--port 3870] [--db PATH] [--import-yaml PATH] [--debug] [--open] [--def
 
 An empty SQLite database is valid. Explore and Add Service populate it.
 
+## macOS menu bar
+
+A Tauri 2 wrapper lives in `src-tauri/`. It stays in the menu bar (no Dock icon) until you pop the window out.
+
+Requirements: Node.js 20+, [Rust](https://rustup.rs/) (`rustc`), and Xcode Command Line Tools (`xcode-select --install`).
+
+```bash
+npm install
+npm run desktop:dev    # `npm run build` then `tauri dev` (menu bar, debug)
+npm run desktop        # production `.app` + DMG under `src-tauri/target/release/bundle/`
+```
+
+The wrapper starts `node dist/cli.js` with your login-shell `PATH` (so `kubectl`, `bao`, and `code` still work). If something is already healthy on `127.0.0.1:3870`–`3879`, it attaches instead of spawning a second server. Set `BATBELT_HOME` to override the repo path.
+
+| Control | Action |
+| --- | --- |
+| Menu bar icon (left click) | Toggle the popover |
+| Tray **Open** | Same toggle |
+| ⌘⇧B | Same toggle |
+| **Pop out** (tray menu) | Same window, title bar, resizable, Dock icon |
+| Window close | Return to menu bar (does not quit) |
+| **Quit** (tray menu) | Stop the Node server the app spawned and exit |
+| **Open in browser** | Open the localhost UI in your browser |
+
+External links (Homepage shortcuts, OIDC on port `8250`) open in the system browser. On first launch the app enables a Login Item (`tauri-plugin-autostart`); manage it in **System Settings → General → Login Items**. Finder-launched apps often miss Homebrew/nvm; the wrapper prepends those to `PATH`. Closing the window does not quit: use **Quit** in the tray menu.
+
 ## Data
 
 | Path | Contents |

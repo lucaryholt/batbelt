@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,14 @@ const MIME: Record<string, string> = {
   ".map": "application/json",
   ".ico": "image/x-icon",
 };
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 function webRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist", "web");
@@ -47,7 +55,7 @@ export function createHostApp(): Hono {
           join(root, "index.html"),
         ];
         for (const file of candidates) {
-          if (!file.startsWith(root) || !existsSync(file)) continue;
+          if (!file.startsWith(root) || !isFile(file)) continue;
           const data = await readFile(file);
           const type = MIME[extname(file)] ?? "application/octet-stream";
           return c.body(data, 200, { "content-type": type });
