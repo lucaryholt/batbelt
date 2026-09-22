@@ -1,2 +1,0 @@
-- pr looker: monitor github PRs where you/your team are requested as reviewer
-- homepage: shortcuts to open cursor/code/pi on a specific directory
