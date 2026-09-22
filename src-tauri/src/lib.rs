@@ -127,10 +127,12 @@ fn login_shell_path() -> String {
     path
 }
 
-fn newest_nvm_bin(home: &str) -> Option<PathBuf> {
+fn nvm_bins(home: &str) -> Vec<PathBuf> {
     let nvm = PathBuf::from(home).join(".nvm/versions/node");
-    let mut versions: Vec<(Vec<u32>, PathBuf)> = std::fs::read_dir(nvm)
-        .ok()?
+    let Ok(entries) = std::fs::read_dir(nvm) else {
+        return Vec::new();
+    };
+    let mut versions: Vec<(Vec<u32>, PathBuf)> = entries
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| {
             let bin = entry.path().join("bin");
@@ -147,7 +149,71 @@ fn newest_nvm_bin(home: &str) -> Option<PathBuf> {
         })
         .collect();
     versions.sort();
-    versions.pop().map(|(_, bin)| bin)
+    versions.reverse();
+    versions.into_iter().map(|(_, bin)| bin).collect()
+}
+
+fn newest_nvm_bin(home: &str) -> Option<PathBuf> {
+    nvm_bins(home).into_iter().next()
+}
+
+// Node candidates in order of preference: whatever the login shell resolves
+// first, then every installed nvm version newest to oldest, then the usual
+// system prefixes.
+fn node_candidates(path: &str) -> Vec<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    let push = |candidate: PathBuf, list: &mut Vec<PathBuf>| {
+        if candidate.is_file() && !list.contains(&candidate) {
+            list.push(candidate);
+        }
+    };
+    if let Some(node) = which_in_path("node", path) {
+        push(node, &mut candidates);
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        for bin in nvm_bins(&home) {
+            push(bin.join("node"), &mut candidates);
+        }
+    }
+    for prefix in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"] {
+        push(PathBuf::from(prefix).join("node"), &mut candidates);
+    }
+    candidates
+}
+
+// better-sqlite3 is a native module, so it only loads under the Node version it
+// was compiled against. Which Node comes first on PATH changes whenever nvm's
+// default does, so ask each candidate to open a database before betting the
+// server on it.
+fn runs_native_modules(node: &Path, root: &Path) -> bool {
+    if !root.join("node_modules/better-sqlite3").is_dir() {
+        return true;
+    }
+    Command::new(node)
+        .args(["-e", "require('better-sqlite3')(':memory:').close()"])
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn pick_node(root: &Path, path: &str) -> Option<PathBuf> {
+    let candidates = node_candidates(path);
+    for candidate in &candidates {
+        if runs_native_modules(candidate, root) {
+            return Some(candidate.clone());
+        }
+        log_line(&format!(
+            "{} cannot load better-sqlite3, trying the next node",
+            candidate.display()
+        ));
+    }
+    // Nothing works; run the preferred one anyway so the log carries Node's own
+    // diagnostics rather than a guess of ours.
+    candidates.into_iter().next()
 }
 
 fn which_in_path(name: &str, path: &str) -> Option<PathBuf> {
@@ -371,9 +437,6 @@ fn spawn_server(app: &AppHandle) -> Result<u16, String> {
         return Ok(port);
     }
     let path = login_shell_path();
-    let node = which_in_path("node", &path).ok_or_else(|| {
-        "node was not found on PATH. Install Node.js 20+ and the Homebrew/nvm binaries.".to_string()
-    })?;
     let root = app_root(app);
     let cli = root.join("dist").join("cli.js");
     if !cli.is_file() {
@@ -382,6 +445,9 @@ fn spawn_server(app: &AppHandle) -> Result<u16, String> {
             cli.display()
         ));
     }
+    let node = pick_node(&root, &path).ok_or_else(|| {
+        "node was not found on PATH. Install Node.js 20+ and the Homebrew/nvm binaries.".to_string()
+    })?;
     let port = (PORT_MIN..=PORT_MAX)
         .find(|p| {
             TcpStream::connect_timeout(

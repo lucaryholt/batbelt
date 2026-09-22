@@ -8,6 +8,7 @@ import { HomepageApp } from "../modules/homepage/App";
 import { KubefwdApp } from "../modules/kubefwd/App";
 import { SteamerApp } from "../modules/steamer/App";
 import { KickflipApp } from "../modules/kickflip/App";
+import { PrlookerApp } from "../modules/prlooker/App";
 
 function modulePath(mod: ModuleDescriptor): string {
   return `/${mod.id}/${mod.pages[0]?.path ?? ""}`;
@@ -88,6 +89,7 @@ export function App() {
           <Route path="/kubefwd/*" element={<KubefwdApp />} />
           <Route path="/steamer/*" element={<SteamerApp />} />
           <Route path="/kickflip/*" element={<KickflipApp />} />
+          <Route path="/prlooker/*" element={<PrlookerApp />} />
         </Routes>
       </div>
       {toast && <div className={`toast${toast.error ? " error" : ""}`}>{toast.msg}</div>}

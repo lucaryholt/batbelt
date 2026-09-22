@@ -1,10 +1,25 @@
 import { randomUUID } from "node:crypto";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { parse, stringify } from "yaml";
-import type { HomepageConfig, Section, Shortcut } from "./types.js";
+import { expandUserPath, isExpandedAbsolute } from "../../expand-path.js";
+import type {
+  DirShortcut,
+  HomepageConfig,
+  Section,
+  Shortcut,
+  TerminalConfig,
+  UrlShortcut,
+} from "./types.js";
+import { isDirTool } from "./types.js";
 import { configFilePath, ensureAppDirs } from "./paths.js";
 
-export const emptyConfig = (): HomepageConfig => ({ starred: [], sections: [] });
+export const emptyTerminal = (): TerminalConfig => ({ kind: "terminal-app" });
+
+export const emptyConfig = (): HomepageConfig => ({
+  starred: [],
+  sections: [],
+  terminal: emptyTerminal(),
+});
 
 export function isHttpUrl(value: string): boolean {
   try {
@@ -22,8 +37,44 @@ function asRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function normalizeShortcut(raw: unknown, sectionTitle: string, index: number): Shortcut {
-  const row = asRecord(raw, `Shortcut ${index} in ${sectionTitle}`);
+function normalizeTerminal(raw: unknown): TerminalConfig {
+  if (raw == null) return emptyTerminal();
+  const row = asRecord(raw, "terminal");
+  const kind = String(row.kind ?? "").trim();
+  if (kind === "terminal-app" || kind === "iterm-tab") return { kind: "terminal-app" };
+  if (kind === "kitty-tab") {
+    const listenOn = String(row.listenOn ?? "").trim();
+    return listenOn ? { kind: "kitty-tab", listenOn } : { kind: "kitty-tab" };
+  }
+  if (kind === "custom") {
+    if (!Array.isArray(row.argv) || row.argv.length === 0) {
+      throw new Error("terminal.argv must be a non-empty array");
+    }
+    const argv = row.argv.map((item, i) => {
+      if (typeof item !== "string" || !item.trim()) {
+        throw new Error(`terminal.argv[${i}] must be a non-empty string`);
+      }
+      return item.trim();
+    });
+    return { kind: "custom", argv };
+  }
+  throw new Error("terminal.kind must be kitty-tab, terminal-app, or custom");
+}
+
+function shortcutKind(row: Record<string, unknown>): "url" | "dir" {
+  const kind = String(row.kind ?? "").trim();
+  if (kind === "url" || kind === "dir") return kind;
+  const url = String(row.url ?? "").trim();
+  if (url) return "url";
+  if (String(row.path ?? "").trim()) return "dir";
+  throw new Error("shortcut is missing a URL or path");
+}
+
+function normalizeUrlShortcut(
+  row: Record<string, unknown>,
+  sectionTitle: string,
+  index: number,
+): UrlShortcut {
   const label = String(row.label ?? "").trim();
   const url = String(row.url ?? "").trim();
   if (!label) throw new Error(`Shortcut ${index} in "${sectionTitle}" is missing a label`);
@@ -33,9 +84,56 @@ function normalizeShortcut(raw: unknown, sectionTitle: string, index: number): S
   }
   return {
     id: String(row.id ?? "").trim() || randomUUID(),
+    kind: "url",
     label,
     url,
   };
+}
+
+function normalizeDirShortcut(
+  row: Record<string, unknown>,
+  sectionTitle: string,
+  index: number,
+): DirShortcut {
+  const label = String(row.label ?? "").trim();
+  const path = String(row.path ?? "").trim();
+  const rawTool = String(row.tool ?? "").trim();
+  const tool = rawTool === "cursor" ? "code" : rawTool;
+  if (!label) throw new Error(`Shortcut ${index} in "${sectionTitle}" is missing a label`);
+  if (!path) throw new Error(`Shortcut "${label}" in "${sectionTitle}" is missing a path`);
+  if (path.includes("\0")) {
+    throw new Error(`Shortcut "${label}" in "${sectionTitle}" path must not contain NUL`);
+  }
+  if (!isExpandedAbsolute(path)) {
+    throw new Error(`Shortcut "${label}" in "${sectionTitle}" path must be absolute or start with ~/`);
+  }
+  if (!isDirTool(tool)) {
+    throw new Error(`Shortcut "${label}" in "${sectionTitle}" tool must be code or pi`);
+  }
+  return {
+    id: String(row.id ?? "").trim() || randomUUID(),
+    kind: "dir",
+    label,
+    path,
+    tool,
+  };
+}
+
+function normalizeShortcut(raw: unknown, sectionTitle: string, index: number): Shortcut {
+  const row = asRecord(raw, `Shortcut ${index} in ${sectionTitle}`);
+  try {
+    const kind = shortcutKind(row);
+    return kind === "dir"
+      ? normalizeDirShortcut(row, sectionTitle, index)
+      : normalizeUrlShortcut(row, sectionTitle, index);
+  } catch (err) {
+    const message = (err as Error).message;
+    if (message === "shortcut is missing a URL or path") {
+      const label = String(row.label ?? "").trim() || String(index);
+      throw new Error(`Shortcut "${label}" in "${sectionTitle}" is missing a URL or path`);
+    }
+    throw err;
+  }
 }
 
 function normalizeSection(raw: unknown, index: number): Section {
@@ -82,6 +180,21 @@ function normalizeStarred(raw: unknown, sections: Section[]): string[] {
   return out;
 }
 
+export function findShortcut(
+  config: HomepageConfig,
+  id: string,
+): { shortcut: Shortcut; section: Section } | undefined {
+  for (const section of config.sections) {
+    const shortcut = section.shortcuts.find((item) => item.id === id);
+    if (shortcut) return { shortcut, section };
+  }
+  return undefined;
+}
+
+export function expandShortcutPath(path: string): string {
+  return expandUserPath(path);
+}
+
 export function normalizeConfig(raw: unknown): HomepageConfig {
   if (raw == null || raw === "") return emptyConfig();
   const row = asRecord(raw, "Homepage config");
@@ -95,7 +208,11 @@ export function normalizeConfig(raw: unknown): HomepageConfig {
       ids.add(shortcut.id);
     }
   }
-  return { starred: normalizeStarred(row.starred, sections), sections };
+  return {
+    starred: normalizeStarred(row.starred, sections),
+    sections,
+    terminal: normalizeTerminal(row.terminal),
+  };
 }
 
 export async function loadConfig(): Promise<HomepageConfig> {

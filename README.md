@@ -2,12 +2,13 @@
 
 Localhost toolbox with a shared UI shell. Modules:
 
-- **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of shortcuts, plus a starred row above them
+- **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of URL and folder shortcuts, plus a starred row above them
 - **[Kubefwd](src/modules/kubefwd/README.md)** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
 - **[Steamer](src/modules/steamer/README.md)** — OpenBao KV compare + write on one page, with confirmation before every write
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
+- **[PR Looker](src/modules/prlooker/README.md)** — GitHub PR inbox (review, assigned, authored, mentioned) via `gh`
 
-⌃1–⌃4 jump to the modules in sidebar order, in the browser and the menu bar app alike.
+⌃1–⌃5 jump to the modules in sidebar order, in the browser and the menu bar app alike.
 
 The server binds to `127.0.0.1` only.
 
@@ -16,6 +17,8 @@ The server binds to `127.0.0.1` only.
 - Node.js 20+
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/) on your `PATH` for Kubefwd and Kickflip
 - The [`bao`](https://openbao.org/docs/commands/) CLI on your `PATH` for Steamer
+- The [`gh`](https://cli.github.com/) CLI on your `PATH` for PR Looker
+- `code` / `pi` on `PATH` for Homepage folder shortcuts; Kitty tabs also work from an installed `kitty.app` without `kitten` on `PATH`
 - OIDC already enabled on each OpenBao instance, with `http://localhost:8250/oidc/callback` allowed as a redirect URI
 
 ## Setup
@@ -64,9 +67,9 @@ npm run desktop:dev    # `npm run build` then `tauri dev` (menu bar, debug)
 npm run desktop        # production `.app` + DMG under `src-tauri/target/release/bundle/`
 ```
 
-The wrapper starts `node dist/cli.js` with your login-shell `PATH` (so `kubectl`, `bao`, and `code` still work). If something is already healthy on `127.0.0.1:3870`–`3879`, it attaches instead of spawning a second server. Set `BATBELT_HOME` to override the repo path.
+The wrapper starts `node dist/cli.js` with your login-shell `PATH` (so `kubectl`, `bao`, `code`, `gh`, `pi`, and `kitten` still work). If something is already healthy on `127.0.0.1:3870`–`3879`, it attaches instead of spawning a second server. Set `BATBELT_HOME` to override the repo path.
 
-It deliberately uses the same `node` your shell resolves, because `better-sqlite3` is a native module tied to one Node major version. After switching Node versions with `nvm`, run `npm rebuild better-sqlite3`. Launcher and server output goes to `~/Library/Logs/batbelt-desktop.log`.
+It prefers the `node` your shell resolves, but `better-sqlite3` is a native module tied to one Node major version, and which Node comes first on `PATH` changes whenever nvm's default does. So the launcher asks each candidate (shell `node`, then installed nvm versions newest to oldest, then `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`) to open a database and uses the first that can. Run `npm rebuild better-sqlite3` under the Node you want if you'd rather it use a newer one. Launcher and server output goes to `~/Library/Logs/batbelt-desktop.log`.
 
 | Control | Action |
 | --- | --- |
@@ -86,11 +89,12 @@ External links (Homepage shortcuts, OIDC on port `8250`) open in the system brow
 
 | Path | Contents |
 | --- | --- |
-| `~/.config/batbelt/homepage/config.yaml` | Homepage sections and shortcuts |
+| `~/.config/batbelt/homepage/config.yaml` | Homepage sections, shortcuts, and Pi terminal |
 | `~/.config/batbelt/kubefwd.db` | Kubefwd services and settings |
 | `~/.config/batbelt/steamer/config.yaml` | Steamer environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment OpenBao tokens (`0600`) |
 | `~/.config/batbelt/kickflip/config.yaml` | Kickflip contexts, namespaces, and services |
+| `~/.config/batbelt/prlooker/config.yaml` | PR Looker poll interval and team slugs |
 
 The original kubefwd and bao-helper apps keep their own files. To bring an existing kubefwd YAML across:
 
@@ -100,7 +104,8 @@ npx tsx src/cli.ts --import-yaml ~/.kubefwd.yaml
 
 ## Modules
 
-- [Homepage](src/modules/homepage/README.md) — Links board with a starred row of pinned shortcuts. YAML + UI CRUD; confirm deletes only.
+- [Homepage](src/modules/homepage/README.md) — Links board with URL and folder tiles, a starred row, and a homepage-wide Pi terminal. YAML + UI CRUD; confirm deletes only.
 - [Kubefwd](src/modules/kubefwd/README.md) — Services, Proxy, Port Checker, Explore. SQLite only; YAML is `--import-yaml`.
 - [Steamer](src/modules/steamer/README.md) — Secrets + Settings. Confirm every write and settings save. OIDC callback on port `8250`. Search filters browse paths and key names.
 - [Kickflip](src/modules/kickflip/README.md) — Services tile grid. File-only YAML; first start seeds the old restarter lists.
+- [PR Looker](src/modules/prlooker/README.md) — Inbox tabs via `gh search prs`. File-only YAML for poll interval and teams.

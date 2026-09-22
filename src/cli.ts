@@ -10,6 +10,7 @@ import { homepageModule } from "./modules/homepage/index.js";
 import { kubefwdModule } from "./modules/kubefwd/index.js";
 import { steamerModule } from "./modules/steamer/index.js";
 import { kickflipModule } from "./modules/kickflip/index.js";
+import { prlookerModule } from "./modules/prlooker/index.js";
 
 async function main(): Promise<void> {
   const program = new Command();
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   registerModule(kubefwdModule);
   registerModule(steamerModule);
   registerModule(kickflipModule);
+  registerModule(prlookerModule);
 
   for (const mod of getModules()) {
     await mod.start?.(ctx);

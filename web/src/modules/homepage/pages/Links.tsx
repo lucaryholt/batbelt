@@ -7,9 +7,11 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { saveConfig } from "../api";
+import { getTools, openDirectory, saveConfig } from "../api";
 import { buildMatcher, nextTileId, normalizeQuery, type NavDirection } from "../filter";
-import type { HomepageConfig, Section, Shortcut } from "../types";
+import type { DirTool, HomepageConfig, Section, Shortcut, ToolsStatus } from "../types";
+import { isDirShortcut, isUrlShortcut } from "../types";
+import { useToast } from "../../../shell/toast";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -49,6 +51,19 @@ function StarIcon({ filled }: { filled?: boolean }) {
   );
 }
 
+function FolderIcon() {
+  return (
+    <svg className="folder-glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M2 4.5h4.2l1.3 1.4H14V13H2V4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -64,7 +79,7 @@ function withStarred(
   sections: Section[],
   starred = starredIds(config),
 ): HomepageConfig {
-  return { starred, sections };
+  return { ...config, starred, sections };
 }
 
 function dropStarredIds(starred: string[], drop: Set<string>): string[] {
@@ -84,6 +99,18 @@ function resolveStarred(config: HomepageConfig): { shortcut: Shortcut; section: 
     if (hit) hits.push(hit);
   }
   return hits;
+}
+
+function shortcutTarget(shortcut: Shortcut): string {
+  return isDirShortcut(shortcut) ? shortcut.path : shortcut.url;
+}
+
+function dirSubtitle(shortcut: Shortcut, terminalKind?: string): string {
+  if (!isDirShortcut(shortcut)) return "";
+  if (shortcut.tool === "pi" && terminalKind) {
+    return `pi · ${terminalKind} · ${shortcut.path}`;
+  }
+  return `${shortcut.tool} · ${shortcut.path}`;
 }
 
 function IconButton({
@@ -122,6 +149,7 @@ function ShortcutTile({
   starred,
   locked,
   selected,
+  terminalKind,
   tileRef,
   onEdit,
   onStar,
@@ -131,23 +159,21 @@ function ShortcutTile({
   starred: boolean;
   locked: boolean;
   selected?: boolean;
-  tileRef?: (el: HTMLAnchorElement | null) => void;
+  terminalKind?: string;
+  tileRef?: (el: HTMLElement | null) => void;
   onEdit: () => void;
   onStar: () => void;
   onOpen: () => void;
 }) {
-  return (
-    <a
-      ref={tileRef}
-      className={`shortcut-tile${selected ? " selected" : ""}`}
-      href={shortcut.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-selected={selected}
-      onClick={onOpen}
-    >
+  const dir = isDirShortcut(shortcut);
+  const className = `shortcut-tile${dir ? " dir" : ""}${selected ? " selected" : ""}`;
+  const body = (
+    <>
       <div className="shortcut-tile-head">
-        <span className="shortcut-label">{shortcut.label}</span>
+        <span className="shortcut-label">
+          {dir && <FolderIcon />}
+          {shortcut.label}
+        </span>
         <div className="shortcut-tile-actions">
           <IconButton
             label={starred ? `Unstar ${shortcut.label}` : `Star ${shortcut.label}`}
@@ -160,7 +186,35 @@ function ShortcutTile({
           <IconButton label={`Edit ${shortcut.label}`} disabled={locked} onClick={onEdit} />
         </div>
       </div>
-      <span className="muted">{shortcut.url}</span>
+      <span className="muted">{dir ? dirSubtitle(shortcut, terminalKind) : shortcut.url}</span>
+    </>
+  );
+
+  if (dir) {
+    return (
+      <button
+        type="button"
+        ref={tileRef}
+        className={className}
+        aria-selected={selected}
+        onClick={onOpen}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <a
+      ref={tileRef as (el: HTMLAnchorElement | null) => void}
+      className={className}
+      href={shortcut.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-selected={selected}
+      onClick={onOpen}
+    >
+      {body}
     </a>
   );
 }
@@ -188,20 +242,31 @@ export const LinksPage = forwardRef<
   const [message, setMessage] = useState<string | null>(null);
   const [sectionTitle, setSectionTitle] = useState("");
   const [sectionLogo, setSectionLogo] = useState("");
+  const [shortcutKind, setShortcutKind] = useState<"url" | "dir">("url");
   const [shortcutLabel, setShortcutLabel] = useState("");
   const [shortcutUrl, setShortcutUrl] = useState("");
+  const [shortcutPath, setShortcutPath] = useState("");
+  const [shortcutTool, setShortcutTool] = useState<DirTool>("code");
+  const [tools, setTools] = useState<ToolsStatus | null>(null);
   const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
-  const tileRefs = useRef(new Map<string, HTMLAnchorElement>());
+  const tileRefs = useRef(new Map<string, HTMLElement>());
   const navIdsRef = useRef<string[]>([]);
   const queryRef = useRef(query);
   const selectedIdRef = useRef(selectedId);
   const modalOpenRef = useRef(false);
+  const { flash } = useToast();
   queryRef.current = query;
   selectedIdRef.current = selectedId;
   modalOpenRef.current = modal !== null;
+
+  useEffect(() => {
+    void getTools()
+      .then(setTools)
+      .catch(() => setTools(null));
+  }, []);
 
   async function persist(next: HomepageConfig, lockId?: string) {
     setSaving(lockId ?? "all");
@@ -223,8 +288,11 @@ export const LinksPage = forwardRef<
   }
 
   function openShortcut(sectionId: string, shortcut?: Shortcut) {
+    setShortcutKind(shortcut && isDirShortcut(shortcut) ? "dir" : "url");
     setShortcutLabel(shortcut?.label ?? "");
-    setShortcutUrl(shortcut?.url ?? "");
+    setShortcutUrl(shortcut && isUrlShortcut(shortcut) ? shortcut.url : "");
+    setShortcutPath(shortcut && isDirShortcut(shortcut) ? shortcut.path : "");
+    setShortcutTool(shortcut && isDirShortcut(shortcut) ? shortcut.tool : "code");
     setModal({ kind: "shortcut", sectionId, shortcut });
   }
 
@@ -265,16 +333,28 @@ export const LinksPage = forwardRef<
   async function saveShortcut() {
     if (modal?.kind !== "shortcut") return;
     const label = shortcutLabel.trim();
-    const url = shortcutUrl.trim();
-    if (!label || !url) {
-      setError("Label and URL are required");
-      return;
+    let nextShortcut: Shortcut;
+    if (shortcutKind === "url") {
+      const url = shortcutUrl.trim();
+      if (!label || !url) {
+        setError("Label and URL are required");
+        return;
+      }
+      nextShortcut = { id: modal.shortcut?.id ?? newId(), kind: "url", label, url };
+    } else {
+      const path = shortcutPath.trim();
+      if (!label || !path) {
+        setError("Label and path are required");
+        return;
+      }
+      nextShortcut = {
+        id: modal.shortcut?.id ?? newId(),
+        kind: "dir",
+        label,
+        path,
+        tool: shortcutTool,
+      };
     }
-    const nextShortcut: Shortcut = {
-      id: modal.shortcut?.id ?? newId(),
-      label,
-      url,
-    };
     const next: HomepageConfig = withStarred(
       config,
       config.sections.map((section) => {
@@ -413,7 +493,7 @@ export const LinksPage = forwardRef<
   const navStarred = new Set(starredHits.map((hit) => hit.shortcut.id));
 
   function registerTile(id: string) {
-    return (el: HTMLAnchorElement | null) => {
+    return (el: HTMLElement | null) => {
       if (el) tileRefs.current.set(id, el);
       else tileRefs.current.delete(id);
     };
@@ -422,6 +502,18 @@ export const LinksPage = forwardRef<
   function resetFilter() {
     setQuery("");
     setSelectedId(null);
+  }
+
+  function handleOpen(shortcut: Shortcut) {
+    resetFilter();
+    if (!isDirShortcut(shortcut)) return;
+    void openDirectory(shortcut.id)
+      .then((res) => {
+        if (res.fallback === "kitty-window") {
+          flash("Kitty remote control failed; opened a new Kitty window.", true);
+        }
+      })
+      .catch((err: Error) => flash(err.message, true));
   }
 
   const navKey = navIds.join("|");
@@ -533,6 +625,8 @@ export const LinksPage = forwardRef<
     };
   }, []);
 
+  const terminalKind = config.terminal?.kind ?? "terminal-app";
+
   return (
     <div className="stack">
       {message && <div className="banner ok">{message}</div>}
@@ -557,11 +651,12 @@ export const LinksPage = forwardRef<
                 shortcut={shortcut}
                 starred
                 selected={selectedId === shortcut.id}
+                terminalKind={terminalKind}
                 tileRef={registerTile(shortcut.id)}
                 locked={saving === section.id || saving === "all" || saving === "starred"}
                 onEdit={() => openShortcut(section.id, shortcut)}
                 onStar={() => void toggleStar(shortcut.id)}
-                onOpen={resetFilter}
+                onOpen={() => handleOpen(shortcut)}
               />
             ))}
           </div>
@@ -630,11 +725,12 @@ export const LinksPage = forwardRef<
                     shortcut={shortcut}
                     starred={pinned.has(shortcut.id)}
                     selected={!navStarred.has(shortcut.id) && selectedId === shortcut.id}
+                    terminalKind={terminalKind}
                     tileRef={navStarred.has(shortcut.id) ? undefined : registerTile(shortcut.id)}
                     locked={locked}
                     onEdit={() => openShortcut(section.id, shortcut)}
                     onStar={() => void toggleStar(shortcut.id)}
-                    onOpen={resetFilter}
+                    onOpen={() => handleOpen(shortcut)}
                   />
                 ))}
               </div>
@@ -679,19 +775,63 @@ export const LinksPage = forwardRef<
         <div className="modal-backdrop">
           <div className="modal">
             <h2>{modal.shortcut ? "Edit shortcut" : "Add shortcut"}</h2>
-            <label className="field">
+            <div className="kind-toggle" role="group" aria-label="Shortcut kind">
+              <button
+                type="button"
+                className={`btn small${shortcutKind === "url" ? " primary" : ""}`}
+                onClick={() => setShortcutKind("url")}
+              >
+                URL
+              </button>
+              <button
+                type="button"
+                className={`btn small${shortcutKind === "dir" ? " primary" : ""}`}
+                onClick={() => setShortcutKind("dir")}
+              >
+                Folder
+              </button>
+            </div>
+            <label className="field" style={{ marginTop: 12 }}>
               Label
               <input value={shortcutLabel} onChange={(e) => setShortcutLabel(e.target.value)} placeholder="Dev" />
             </label>
-            <label className="field" style={{ marginTop: 12 }}>
-              URL
-              <input
-                className="mono"
-                value={shortcutUrl}
-                onChange={(e) => setShortcutUrl(e.target.value)}
-                placeholder="https://airflow-dev.example.com"
-              />
-            </label>
+            {shortcutKind === "url" ? (
+              <label className="field" style={{ marginTop: 12 }}>
+                URL
+                <input
+                  className="mono"
+                  value={shortcutUrl}
+                  onChange={(e) => setShortcutUrl(e.target.value)}
+                  placeholder="https://airflow-dev.example.com"
+                />
+              </label>
+            ) : (
+              <>
+                <label className="field" style={{ marginTop: 12 }}>
+                  Path
+                  <input
+                    className="mono"
+                    value={shortcutPath}
+                    onChange={(e) => setShortcutPath(e.target.value)}
+                    placeholder="~/scripts/batbelt"
+                  />
+                </label>
+                <label className="field" style={{ marginTop: 12 }}>
+                  Open with
+                  <select
+                    value={shortcutTool}
+                    onChange={(e) => setShortcutTool(e.target.value as DirTool)}
+                  >
+                    {(["code", "pi"] as const).map((tool) => (
+                      <option key={tool} value={tool} disabled={tools ? tools[tool] === false : false}>
+                        {tool}
+                        {tools && tools[tool] === false ? " (not on PATH)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
             {modalActions(
               modal.shortcut
                 ? (() => {
@@ -726,7 +866,7 @@ export const LinksPage = forwardRef<
               </p>
             ) : (
               <p>
-                Remove <strong>{modal.shortcut.label}</strong> — <code>{modal.shortcut.url}</code>?
+                Remove <strong>{modal.shortcut.label}</strong> — <code>{shortcutTarget(modal.shortcut)}</code>?
               </p>
             )}
             <div className="actions" style={{ marginTop: 16 }}>

@@ -1,7 +1,7 @@
 {
   "name": "batbelt",
   "version": "0.1.0",
-  "description": "Modular localhost toolbox: Kubernetes port-forwards and OpenBao secret management",
+  "description": "Modular localhost toolbox: homepage shortcuts, Kubernetes port-forwards, OpenBao secrets, and a GitHub PR inbox",
   "type": "module",
   "bin": {
     "batbelt": "./dist/cli.js"
