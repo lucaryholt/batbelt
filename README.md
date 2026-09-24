@@ -21,6 +21,14 @@ The server binds to `127.0.0.1` only.
 - `code` / `pi` on `PATH` for Homepage folder shortcuts; Kitty tabs also work from an installed `kitty.app` without `kitten` on `PATH`
 - OIDC already enabled on each OpenBao instance, with `http://localhost:8250/oidc/callback` allowed as a redirect URI
 
+On macOS with [Homebrew](https://brew.sh), install `kubectl`, `bao` (formula `openbao`), and `gh`:
+
+```bash
+./scripts/install-clis.sh
+```
+
+That does not run `npm install`, start an OpenBao server, or log you in. `gh auth login`, kubeconfig, and OpenBao OIDC stay separate. Formula `bao` conflicts with `openbao` (both install a `bao` binary); the script will not unlink it.
+
 ## Setup
 
 ```bash
