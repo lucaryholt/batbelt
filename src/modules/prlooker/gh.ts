@@ -167,7 +167,7 @@ export async function fetchInbox(
     { reason: "mentioned", args: searchPrsArgs(["--mentions=@me"]) },
     ...config.teams.map((team) => ({
       reason: "team" as const,
-      args: searchPrsArgs([`review-requested:${team}`]),
+      args: searchPrsArgs([`--review-requested=${team}`]),
     })),
   ];
 
