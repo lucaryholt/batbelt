@@ -194,6 +194,13 @@ export function createRoutes(): Hono {
   });
 
   app.post("/secrets", async (c) => {
+    // Keep the write implementation below so it can be restored once the
+    // feature is ready, but enforce read-only behavior at the API boundary.
+    return c.json(
+      { error: "Secret writes are disabled. Edit this path in the OpenBao UI." },
+      403,
+    );
+
     const body = (await c.req.json()) as WriteRequest;
     const path = cleanPath(body.path ?? "");
     const values = body.values ?? {};

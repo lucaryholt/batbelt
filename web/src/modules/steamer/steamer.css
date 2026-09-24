@@ -96,6 +96,11 @@
   text-transform: uppercase;
 }
 .steamer-app .grid-table input { width: 100%; }
+.steamer-app .grid-table input[readonly] {
+  background: var(--st-sunken);
+  color: var(--text);
+  cursor: default;
+}
 .steamer-app .mono { font-family: inherit; }
 .steamer-app .diff { background: rgba(210, 153, 34, 0.08); }
 .steamer-app .missing { color: var(--muted); font-style: italic; }

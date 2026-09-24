@@ -1,10 +1,10 @@
 # Steamer
 
-Compare and write OpenBao KV secrets across environments. Compare and Write are one **Secrets** page. Every write and every settings save asks for confirmation.
+Compare OpenBao KV secrets across environments. Secret writes are disabled in Steamer; each environment has an **Open in OpenBao** link for making changes in the OpenBao UI. Settings remain editable and every settings save asks for confirmation.
 
 UI: `/steamer/secrets`, `/steamer/settings`.
 
-All OpenBao traffic goes through the [`bao`](https://openbao.org/docs/commands/) CLI. Login is OIDC (`bao login -method=oidc`).
+Secret reads and login go through the [`bao`](https://openbao.org/docs/commands/) CLI. Login is OIDC (`bao login -method=oidc`).
 
 The host binds `127.0.0.1` only. Tokens live under `~/.config/batbelt/steamer/tokens/` so they never overwrite `~/.vault-token`.
 
@@ -38,20 +38,19 @@ environments:
 1. Pick KV mount and path
 2. **Browse paths** to see which keys exist in which environment
 3. **Load existing secret** from one environment or all
-4. Use **Search** to filter browse-path names and key-grid rows (case-insensitive). Hidden values are not searched. Writes still include every key.
-5. Edit the key × environment grid (values hidden until revealed)
-6. Tick which environments to write
-7. Confirm the summary (create vs overwrite, key list), then `bao kv put`
+4. Use **Search** to filter browse-path names and key-grid rows (case-insensitive). Hidden values are not searched.
+5. Compare the read-only key × environment grid (values hidden until revealed)
+6. Use **Open _environment_ in OpenBao** to change the current secret in that environment
 
-The server rejects writes without `confirm: true`, including first-time creates.
+The client write helper and `POST /api/steamer/secrets` both reject all secret writes. The existing `bao kv put` implementation remains in the code but is unreachable until the feature is ready.
 
 ### Settings
 
 Add name, address, optional namespace / KV mount / OIDC mount and role. **Save settings** opens a confirm list. **Log in** / **Log out** stay one-click. Login streams `bao` output; CLI lines are redacted.
 
-## How writes work
+## Disabled write implementation
 
-`bao kv put` with a JSON payload file (`0600`, deleted afterwards). The entire secret is replaced.
+The retained implementation uses `bao kv put` with a JSON payload file (`0600`, deleted afterwards). It would replace the entire secret, but the API currently rejects the request before this code runs.
 
 ## Security
 

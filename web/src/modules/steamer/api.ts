@@ -110,17 +110,11 @@ export async function checkExists(
   );
 }
 
-export async function writeSecrets(input: {
+export async function writeSecrets(_input: {
   mount: string;
   path: string;
   values: Record<string, SecretData>;
   confirm?: boolean;
 }): Promise<WriteResponse> {
-  return parseJson(
-    await fetch("/api/steamer/secrets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    }),
-  );
+  throw new Error("Secret writes are disabled. Edit this path in the OpenBao UI.");
 }

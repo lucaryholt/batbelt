@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import type { AppConfig, EnvResult, EnvStatus, SecretData } from "../types";
-import { checkExists, getSecrets, listSecrets, loginEnv, writeSecrets } from "../api";
+import { getSecrets, listSecrets, loginEnv } from "../api";
 import { PathBrowser } from "../components/PathBrowser";
+import { openBaoSecretUrl } from "../lib/openbao-url";
 import { envErrors } from "../lib/paths";
 
 function allLoadedKeys(results: Record<string, EnvResult<SecretData>>): string[] {
@@ -17,12 +18,6 @@ function allLoadedKeys(results: Record<string, EnvResult<SecretData>>): string[]
 function valuesDiffer(values: Record<string, Record<string, string>>, key: string, envNames: string[]): boolean {
   const set = new Set(envNames.map((name) => values[key]?.[name] ?? ""));
   return set.size > 1;
-}
-
-interface WriteSummary {
-  path: string;
-  keys: string[];
-  envs: { name: string; mode: "create" | "overwrite" }[];
 }
 
 export function SecretsPage({
@@ -42,14 +37,12 @@ export function SecretsPage({
 
   const [mount, setMount] = useState(defaultMount);
   const [path, setPath] = useState("");
-  const [keys, setKeys] = useState<string[]>([""]);
+  const [keys, setKeys] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
-  const [selected, setSelected] = useState<string[]>(envs.map((env) => env.name));
   const [loadFrom, setLoadFrom] = useState(envs[0]?.name ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<WriteSummary | null>(null);
   const [listResults, setListResults] = useState<Record<string, EnvResult<string[]>> | null>(null);
   const [compareResults, setCompareResults] = useState<Record<string, EnvResult<SecretData>> | null>(null);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -66,31 +59,11 @@ export function SecretsPage({
     .filter(({ key }) => !needle || key.toLowerCase().includes(needle))
     .map(({ index }) => index);
 
-  function setKeyName(index: number, name: string) {
-    const previous = keys[index];
-    setKeys((current) => current.map((key, i) => (i === index ? name : key)));
-    if (previous === name) return;
-    setValues((current) => {
-      if (!current[previous]) return current;
-      const next = { ...current };
-      next[name] = { ...(next[name] ?? {}), ...next[previous] };
-      delete next[previous];
-      return next;
-    });
-  }
-
-  function setCell(key: string, envName: string, value: string) {
-    setValues((current) => ({
-      ...current,
-      [key]: { ...(current[key] ?? {}), [envName]: value },
-    }));
-  }
-
   function applyLoaded(results: Record<string, EnvResult<SecretData>>, envName?: string) {
     const nextKeys = envName
       ? Object.keys(results[envName]?.data ?? {})
       : allLoadedKeys(results);
-    setKeys(nextKeys.length ? nextKeys : [""]);
+    setKeys(nextKeys);
     setValues((current) => {
       const next = { ...current };
       const names = envName ? [envName] : envs.map((env) => env.name);
@@ -177,72 +150,6 @@ export function SecretsPage({
     }
   }
 
-  function payload(): Record<string, SecretData> {
-    const out: Record<string, SecretData> = {};
-    for (const envName of selected) {
-      const data: SecretData = {};
-      for (const key of keys) {
-        const trimmed = key.trim();
-        if (!trimmed) continue;
-        data[trimmed] = values[key]?.[envName] ?? "";
-      }
-      out[envName] = data;
-    }
-    return out;
-  }
-
-  async function requestWrite() {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const valuesByEnv = payload();
-      if (!path.trim()) throw new Error("Path is required");
-      if (!Object.keys(valuesByEnv).length) throw new Error("Select at least one environment");
-      const keyList = keys.map((key) => key.trim()).filter(Boolean);
-      if (!keyList.length) throw new Error("Add at least one key");
-      const exists = await checkExists(mount, path, Object.keys(valuesByEnv));
-      setConfirm({
-        path,
-        keys: keyList,
-        envs: Object.keys(valuesByEnv).map((name) => ({
-          name,
-          mode: exists.exists[name] ? "overwrite" : "create",
-        })),
-      });
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function confirmWrite() {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const response = await writeSecrets({
-        mount,
-        path,
-        values: payload(),
-        confirm: true,
-      });
-      const failed = Object.entries(response.results).filter(([, result]) => !result.ok);
-      if (failed.length) {
-        setError(failed.map(([name, result]) => `${name}: ${result.error || "write failed"}`).join(" · "));
-      } else {
-        setMessage(`Wrote ${path} to ${Object.keys(response.results).join(", ")}.`);
-      }
-      setConfirm(null);
-      await onRefresh();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (!envs.length) {
     return (
       <div className="card">
@@ -322,20 +229,28 @@ export function SecretsPage({
             </button>
           )}
         </div>
-        <div className="checkbox-row" style={{ marginTop: 16 }}>
+        <div className="actions" style={{ marginTop: 16 }}>
           {envs.map((env) => (
-            <label key={env.name}>
-              <input
-                type="checkbox"
-                checked={selected.includes(env.name)}
-                onChange={(e) => {
-                  setSelected((current) =>
-                    e.target.checked ? [...current, env.name] : current.filter((name) => name !== env.name),
-                  );
-                }}
-              />
-              Write to {env.name}
-            </label>
+            path.trim() ? (
+              <a
+                key={env.name}
+                className="btn"
+                href={openBaoSecretUrl({
+                  addr: env.addr,
+                  mount,
+                  path,
+                  namespace: env.namespace,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open {env.name} in OpenBao
+              </a>
+            ) : (
+              <button key={env.name} className="btn" disabled>
+                Open {env.name} in OpenBao
+              </button>
+            )
           ))}
         </div>
         <label className="field" style={{ marginTop: 16 }}>
@@ -383,12 +298,7 @@ export function SecretsPage({
               return (
                 <tr key={index} className={rowDiff ? "diff" : undefined}>
                   <td>
-                    <input
-                      className="mono"
-                      value={key}
-                      placeholder="api_key"
-                      onChange={(e) => setKeyName(index, e.target.value)}
-                    />
+                    <code>{key}</code>
                   </td>
                   {envs.map((env) => (
                     <td key={env.name}>
@@ -396,7 +306,8 @@ export function SecretsPage({
                         className="mono"
                         type={open ? "text" : "password"}
                         value={values[key]?.[env.name] ?? ""}
-                        onChange={(e) => setCell(key, env.name, e.target.value)}
+                        readOnly
+                        aria-label={`${key} in ${env.name}`}
                       />
                     </td>
                   ))}
@@ -408,17 +319,6 @@ export function SecretsPage({
                       >
                         {open ? "Hide" : "Show"}
                       </button>
-                      <button className="btn small danger" onClick={() => {
-                        const name = keys[index];
-                        setKeys((current) => current.filter((_, i) => i !== index));
-                        setValues((current) => {
-                          const next = { ...current };
-                          delete next[name];
-                          return next;
-                        });
-                      }}>
-                        Remove
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -428,46 +328,15 @@ export function SecretsPage({
         </table>
         {keys.length > 0 && visibleIndexes.length === 0 && (
           <p className="muted" style={{ marginTop: 12 }}>
-            No keys match “{query.trim()}”. Writes still include every key.
+            No keys match “{query.trim()}”.
           </p>
         )}
-        <div className="actions" style={{ marginTop: 16 }}>
-          <button className="btn" onClick={() => setKeys((current) => [...current, ""])}>
-            Add key
-          </button>
-          <button className="btn primary" disabled={busy || loggingIn} onClick={() => void requestWrite()}>
-            Write to selected environments
-          </button>
-        </div>
+        {keys.length === 0 && (
+          <p className="muted" style={{ marginTop: 12 }}>
+            Load an existing secret to compare its values.
+          </p>
+        )}
       </section>
-
-      {confirm && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <h2>Confirm secret write</h2>
-            <p>
-              Write <code>{confirm.path}</code> to {confirm.envs.length} environment
-              {confirm.envs.length === 1 ? "" : "s"}.
-            </p>
-            <ul className="confirm-list">
-              {confirm.envs.map((env) => (
-                <li key={env.name}>
-                  <strong>{env.name}</strong> — {env.mode === "overwrite" ? "overwrite existing" : "create new"}
-                </li>
-              ))}
-            </ul>
-            <p className="muted">Keys: {confirm.keys.join(", ")}</p>
-            <div className="actions">
-              <button className="btn" onClick={() => setConfirm(null)}>
-                Cancel
-              </button>
-              <button className="btn primary" disabled={busy} onClick={() => void confirmWrite()}>
-                Confirm write
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
