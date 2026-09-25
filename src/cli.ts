@@ -4,13 +4,9 @@ import { serve } from "@hono/node-server";
 import open from "open";
 import { DEFAULT_PORT, defaultDbPath, ensureConfigDir } from "./paths.js";
 import { getModules, registerModule } from "./modules/registry.js";
+import { resolveEnabledModules } from "./modules/enabled.js";
 import type { ModuleContext } from "./modules/types.js";
 import { createHostApp } from "./server/index.js";
-import { homepageModule } from "./modules/homepage/index.js";
-import { kubefwdModule } from "./modules/kubefwd/index.js";
-import { steamerModule } from "./modules/steamer/index.js";
-import { kickflipModule } from "./modules/kickflip/index.js";
-import { prlookerModule } from "./modules/prlooker/index.js";
 
 async function main(): Promise<void> {
   const program = new Command();
@@ -53,11 +49,25 @@ async function main(): Promise<void> {
     startDefaultProxies: !!opts.defaultProxy,
   };
 
-  registerModule(homepageModule);
-  registerModule(kubefwdModule);
-  registerModule(steamerModule);
-  registerModule(kickflipModule);
-  registerModule(prlookerModule);
+  const enabled = await resolveEnabledModules();
+  const kubefwdOn = enabled.some((mod) => mod.id === "kubefwd");
+  if (!kubefwdOn) {
+    const kubefwdFlags: string[] = [];
+    if (opts.db !== defaultDbPath()) kubefwdFlags.push("--db");
+    if (opts.importYaml) kubefwdFlags.push("--import-yaml");
+    if (opts.debug) kubefwdFlags.push("--debug");
+    if (opts.default) kubefwdFlags.push("--default");
+    if (opts.defaultProxy) kubefwdFlags.push("--default-proxy");
+    if (kubefwdFlags.length > 0) {
+      process.stderr.write(
+        `Warning: ${kubefwdFlags.join(", ")} ignored because kubefwd is not enabled in modules.yaml\n`,
+      );
+    }
+  }
+
+  for (const mod of enabled) {
+    registerModule(mod);
+  }
 
   for (const mod of getModules()) {
     await mod.start?.(ctx);

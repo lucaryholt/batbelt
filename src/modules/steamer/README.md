@@ -38,9 +38,11 @@ environments:
 1. Pick KV mount and path
 2. **Browse paths** to see which keys exist in which environment
 3. **Load existing secret** from one environment or all
-4. Use **Search** to filter browse-path names and key-grid rows (case-insensitive). Hidden values are not searched.
-5. Compare the read-only key × environment grid (values hidden until revealed)
+4. Use **Search** to filter browse-path names and key rows (case-insensitive). Hidden values are not searched.
+5. Compare values per key: each key is a collapsed row that expands to list every environment’s read-only value vertically (values hidden until revealed). Keys whose values disagree are marked and highlighted.
 6. Use **Open _environment_ in OpenBao** to change the current secret in that environment
+
+A banner on the Secrets page states that Steamer is read-only for now.
 
 The client write helper and `POST /api/steamer/secrets` both reject all secret writes. The existing `bao kv put` implementation remains in the code but is unreachable until the feature is ready.
 

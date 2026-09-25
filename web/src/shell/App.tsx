@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import logoUrl from "../../../src-tauri/icons/128x128.png";
 import { hostApi } from "./api";
@@ -10,12 +10,21 @@ import { SteamerApp } from "../modules/steamer/App";
 import { KickflipApp } from "../modules/kickflip/App";
 import { PrlookerApp } from "../modules/prlooker/App";
 
+const MODULE_APPS: Record<string, ComponentType> = {
+  homepage: HomepageApp,
+  kubefwd: KubefwdApp,
+  steamer: SteamerApp,
+  kickflip: KickflipApp,
+  prlooker: PrlookerApp,
+};
+
 function modulePath(mod: ModuleDescriptor): string {
   return `/${mod.id}/${mod.pages[0]?.path ?? ""}`;
 }
 
 export function App() {
   const [modules, setModules] = useState<ModuleDescriptor[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -25,7 +34,8 @@ export function App() {
     void hostApi
       .getModules()
       .then((res) => setModules(res.modules))
-      .catch((err: Error) => setError(err.message));
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -83,13 +93,23 @@ export function App() {
         <Routes>
           <Route
             path="/"
-            element={first ? <Navigate to={modulePath(first)} replace /> : <p className="muted">Loading…</p>}
+            element={
+              first ? (
+                <Navigate to={modulePath(first)} replace />
+              ) : loaded ? (
+                <p className="muted">
+                  No modules enabled. Edit ~/.config/batbelt/modules.yaml and restart batbelt.
+                </p>
+              ) : (
+                <p className="muted">Loading…</p>
+              )
+            }
           />
-          <Route path="/homepage/*" element={<HomepageApp />} />
-          <Route path="/kubefwd/*" element={<KubefwdApp />} />
-          <Route path="/steamer/*" element={<SteamerApp />} />
-          <Route path="/kickflip/*" element={<KickflipApp />} />
-          <Route path="/prlooker/*" element={<PrlookerApp />} />
+          {modules.map((mod) => {
+            const ModuleApp = MODULE_APPS[mod.id];
+            if (!ModuleApp) return null;
+            return <Route key={mod.id} path={`/${mod.id}/*`} element={<ModuleApp />} />;
+          })}
         </Routes>
       </div>
       {toast && <div className={`toast${toast.error ? " error" : ""}`}>{toast.msg}</div>}

@@ -166,6 +166,10 @@ export function SecretsPage({
 
   return (
     <div className="stack">
+      <div className="banner warn">
+        Steamer is read-only right now. Writing secrets from here does not work reliably, so it is
+        disabled — use <strong>Open … in OpenBao</strong> to make changes.
+      </div>
       {loggedOut.length > 0 && (
         <div className="banner warn">Not logged in to {loggedOut.map((env) => env.name).join(", ")}.</div>
       )}
@@ -280,28 +284,31 @@ export function SecretsPage({
       )}
 
       <section className="card">
-        <table className="grid-table">
-          <thead>
-            <tr>
-              <th>Key</th>
-              {envs.map((env) => (
-                <th key={env.name}>{env.name}</th>
-              ))}
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visibleIndexes.map((index) => {
-              const key = keys[index];
-              const open = revealAll || revealed[key] || !key;
-              const rowDiff = key.trim() !== "" && valuesDiffer(values, key, envs.map((env) => env.name));
-              return (
-                <tr key={index} className={rowDiff ? "diff" : undefined}>
-                  <td>
-                    <code>{key}</code>
-                  </td>
+        <div className="key-list">
+          {visibleIndexes.map((index) => {
+            const key = keys[index];
+            const open = revealAll || revealed[key] || !key;
+            const rowDiff = key.trim() !== "" && valuesDiffer(values, key, envs.map((env) => env.name));
+            return (
+              <details key={index} className={rowDiff ? "key-row diff" : "key-row"}>
+                <summary>
+                  <code>{key}</code>
+                  {rowDiff && <span className="key-diff-mark">differs</span>}
+                  <button
+                    className="btn small"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setRevealed((current) => ({ ...current, [key]: !current[key] }));
+                    }}
+                  >
+                    {open ? "Hide" : "Show"}
+                  </button>
+                </summary>
+                <div className="key-envs">
                   {envs.map((env) => (
-                    <td key={env.name}>
+                    <label key={env.name} className="field">
+                      {env.name}
                       <input
                         className="mono"
                         type={open ? "text" : "password"}
@@ -309,23 +316,13 @@ export function SecretsPage({
                         readOnly
                         aria-label={`${key} in ${env.name}`}
                       />
-                    </td>
+                    </label>
                   ))}
-                  <td>
-                    <div className="actions">
-                      <button
-                        className="btn small"
-                        onClick={() => setRevealed((current) => ({ ...current, [key]: !current[key] }))}
-                      >
-                        {open ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                </div>
+              </details>
+            );
+          })}
+        </div>
         {keys.length > 0 && visibleIndexes.length === 0 && (
           <p className="muted" style={{ marginTop: 12 }}>
             No keys match “{query.trim()}”.

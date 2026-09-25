@@ -8,7 +8,7 @@ Localhost toolbox with a shared UI shell. Modules:
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 - **[PR Looker](src/modules/prlooker/README.md)** — GitHub PR inbox (review, assigned, authored, mentioned) via `gh`
 
-⌃1–⌃5 jump to the modules in sidebar order, in the browser and the menu bar app alike.
+⌃1–⌃9 jump to the enabled modules in sidebar order, in the browser and the menu bar app alike. Which modules load is set in `~/.config/batbelt/modules.yaml` (restart to apply). A missing file loads all five.
 
 The server binds to `127.0.0.1` only.
 
@@ -63,6 +63,17 @@ batbelt [--port 3870] [--db PATH] [--import-yaml PATH] [--debug] [--open] [--def
 
 An empty SQLite database is valid. Explore and Add Service populate it.
 
+Enabled modules are listed in `~/.config/batbelt/modules.yaml` (`$XDG_CONFIG_HOME/batbelt/modules.yaml` when that env var is set). Batbelt does not create this file; if it is missing, all modules start in the order below. Homepage can be omitted. The list order is sidebar and ⌃1–⌃n order. Invalid YAML, unknown ids, or duplicates abort before the server listens. Change the file and restart (including the menu bar app) to apply it.
+
+```yaml
+enabled:
+  - homepage
+  - kubefwd
+  - steamer
+  - kickflip
+  - prlooker
+```
+
 ## macOS menu bar
 
 A Tauri 2 wrapper lives in `src-tauri/`. It stays in the menu bar (no Dock icon) until you pop the window out.
@@ -97,6 +108,7 @@ External links (Homepage shortcuts, OIDC on port `8250`) open in the system brow
 
 | Path | Contents |
 | --- | --- |
+| `~/.config/batbelt/modules.yaml` | Enabled modules and sidebar order (optional; missing means all five) |
 | `~/.config/batbelt/homepage/config.yaml` | Homepage sections, shortcuts, and Pi terminal |
 | `~/.config/batbelt/kubefwd.db` | Kubefwd services and settings |
 | `~/.config/batbelt/steamer/config.yaml` | Steamer environments |
