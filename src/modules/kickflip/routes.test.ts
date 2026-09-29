@@ -45,9 +45,9 @@ describe("kickflip routes", () => {
   }
 
   const runBody = {
-    context: "gke_gowish-devx_europe-west1_api-eu",
+    context: "kind-dev",
     mode: "restart" as const,
-    services: [{ namespace: "personalization-service", name: "brands" }],
+    services: [{ namespace: "a-team", name: "svc-1" }],
     confirm: true,
   };
 
@@ -74,7 +74,7 @@ describe("kickflip routes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ...runBody,
-        services: [{ namespace: "personalization-service", name: "nope" }],
+        services: [{ namespace: "a-team", name: "nope" }],
       }),
     });
     expect(res.status).toBe(400);
@@ -129,14 +129,14 @@ describe("kickflip routes", () => {
     expect(calls).toEqual([
       annotateExternalSecretArgs({
         context: runBody.context,
-        namespace: "personalization-service",
-        externalSecret: "brands-env",
+        namespace: "a-team",
+        externalSecret: "svc-1-env",
         forceSync: "1700000000",
       }),
       rolloutRestartArgs({
         context: runBody.context,
-        namespace: "personalization-service",
-        deployment: "brands",
+        namespace: "a-team",
+        deployment: "svc-1",
       }),
     ]);
   });
@@ -157,8 +157,8 @@ describe("kickflip routes", () => {
     expect(calls).toEqual([
       rolloutRestartArgs({
         context: runBody.context,
-        namespace: "personalization-service",
-        deployment: "brands",
+        namespace: "a-team",
+        deployment: "svc-1",
       }),
     ]);
     expect(annotateExternalSecretArgs({

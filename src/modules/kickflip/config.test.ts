@@ -21,48 +21,23 @@ describe("kickflip config", () => {
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
-  it("seeds the original script services and default context", () => {
+  it("seeds generic example services and default context", () => {
     const seed = seedDefaultConfig();
     expect(seed.contexts).toEqual([
-      { name: "dev", context: "gke_gowish-devx_europe-west1_api-eu", default: true },
+      { name: "dev", context: "kind-dev", default: true },
+      { name: "prod", context: "kind-prod" },
     ]);
-    expect(seed.namespaces.map((ns) => ns.name)).toEqual([
-      "personalization-service",
-      "activation-service",
-      "wishing-experience",
-      "graphql-gateway",
-    ]);
-    expect(seed.namespaces[0].services.map((svc) => svc.name)).toEqual([
-      "brands",
-      "creators",
-      "activity",
-      "partners",
-      "product-updates",
-      "products",
-      "reactions",
-      "recommendations",
-      "wish-genie",
-    ]);
-    expect(seed.namespaces[1].services.map((svc) => svc.name)).toEqual([
-      "audiences",
-      "cards",
-      "followers",
-      "notifications",
-      "occasions",
-      "sharing",
-      "tracking",
-      "users",
-    ]);
-    expect(seed.namespaces[2].services.map((svc) => svc.name)).toEqual(["search", "wishlists"]);
-    expect(seed.namespaces[3].services).toEqual([{ name: "gateway", external_secret: "gateway-env" }]);
-    expect(findService(seed, "brands" as never, "brands")).toBeUndefined();
-    expect(findService(seed, "personalization-service", "brands")).toEqual({
-      name: "brands",
-      namespace: "personalization-service",
-      externalSecret: "brands-env",
-      deployment: "brands",
+    expect(seed.namespaces.map((ns) => ns.name)).toEqual(["a-team", "b-team"]);
+    expect(seed.namespaces[0].services.map((svc) => svc.name)).toEqual(["svc-1", "svc-2"]);
+    expect(seed.namespaces[1].services).toEqual([{ name: "gateway", external_secret: "gateway-env" }]);
+    expect(findService(seed, "svc-1" as never, "svc-1")).toBeUndefined();
+    expect(findService(seed, "a-team", "svc-1")).toEqual({
+      name: "svc-1",
+      namespace: "a-team",
+      externalSecret: "svc-1-env",
+      deployment: "svc-1",
     });
-    expect(findService(seed, "graphql-gateway", "gateway")?.externalSecret).toBe("gateway-env");
+    expect(findService(seed, "b-team", "gateway")?.externalSecret).toBe("gateway-env");
   });
 
   it("writes the seed only when the YAML file is missing", async () => {

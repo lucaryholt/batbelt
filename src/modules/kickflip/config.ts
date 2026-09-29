@@ -9,46 +9,21 @@ import type {
 } from "./types.js";
 import { configFilePath, ensureAppDirs } from "./paths.js";
 
-const SCRIPT_CONTEXT = "gke_gowish-devx_europe-west1_api-eu";
-
-const PERSONALIZATION = [
-  "brands",
-  "creators",
-  "activity",
-  "partners",
-  "product-updates",
-  "products",
-  "reactions",
-  "recommendations",
-  "wish-genie",
-];
-
-const ACTIVATION = [
-  "audiences",
-  "cards",
-  "followers",
-  "notifications",
-  "occasions",
-  "sharing",
-  "tracking",
-  "users",
-];
-
-const WISHING = ["search", "wishlists"];
-
-function named(names: string[]): ServiceConfig[] {
-  return names.map((name) => ({ name }));
-}
+const SCRIPT_CONTEXT = "kind-dev";
 
 export function seedDefaultConfig(): KickflipConfig {
   return {
-    contexts: [{ name: "dev", context: SCRIPT_CONTEXT, default: true }],
+    contexts: [
+      { name: "dev", context: SCRIPT_CONTEXT, default: true },
+      { name: "prod", context: "kind-prod" },
+    ],
     namespaces: [
-      { name: "personalization-service", services: named(PERSONALIZATION) },
-      { name: "activation-service", services: named(ACTIVATION) },
-      { name: "wishing-experience", services: named(WISHING) },
       {
-        name: "graphql-gateway",
+        name: "a-team",
+        services: [{ name: "svc-1" }, { name: "svc-2" }],
+      },
+      {
+        name: "b-team",
         services: [{ name: "gateway", external_secret: "gateway-env" }],
       },
     ],

@@ -13,7 +13,7 @@ UI: `/kickflip/services`.
 
 `~/.config/batbelt/kickflip/config.yaml`
 
-First start writes a seed from the old script (gowish namespaces + default GKE context). Later starts do **not** overwrite that file. Edit on disk, then **Reload config**. The UI never writes the YAML.
+First start writes a generic seed (`kind-dev` / `kind-prod` contexts and `a-team` / `b-team` namespaces). Later starts do **not** overwrite that file. Edit on disk, then **Reload config**. The UI never writes the YAML.
 
 **Open YAML** runs `code` on that file (needs the Cursor/VS Code `code` shell command on `PATH`).
 
@@ -46,16 +46,16 @@ Defaults: ExternalSecret `{name}-env`, Deployment `{name}`. Override per service
 ```yaml
 contexts:
   - name: dev
-    context: gke_gowish-devx_europe-west1_api-eu
+    context: kind-dev
     default: true
   - name: prod
-    context: gke_gowish-prod_europe-west1_api-eu
+    context: kind-prod
 namespaces:
-  - name: personalization-service
+  - name: a-team
     services:
-      - name: brands
-      - name: wish-genie
-  - name: graphql-gateway
+      - name: svc-1
+      - name: svc-2
+  - name: b-team
     services:
       - name: gateway
         external_secret: gateway-env
