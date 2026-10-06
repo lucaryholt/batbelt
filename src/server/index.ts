@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
+import { getHostModulesConfig } from "../modules/enabled.js";
 import { getModules } from "../modules/registry.js";
 import { toDescriptor } from "../modules/types.js";
 
@@ -37,7 +38,10 @@ export function createHostApp(): Hono {
   });
 
   app.get("/api/modules", (c) => {
-    return c.json({ modules: getModules().map(toDescriptor) });
+    return c.json({
+      modules: getModules().map(toDescriptor),
+      typeToSearch: getHostModulesConfig().typeToSearch,
+    });
   });
 
   for (const mod of getModules()) {

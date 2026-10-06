@@ -8,7 +8,7 @@ Localhost toolbox with a shared UI shell. Modules:
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 - **[PR Looker](src/modules/prlooker/README.md)** — GitHub PR inbox (review, assigned, authored, mentioned) via `gh`
 
-⌃1–⌃9 jump to the enabled modules in sidebar order, in the browser and the menu bar app alike. Which modules load is set in `~/.config/batbelt/modules.yaml` (restart to apply). A missing file loads all five.
+⌃1–⌃9 jump to the enabled modules in sidebar order, in the browser and the menu bar app alike. ⌃⇧1–⌃⇧9 open pages of the module you are already in. Typing a letter outside a text field jumps to Homepage search when `typeToSearch` is on (default) and Homepage is enabled. Which modules load is set in `~/.config/batbelt/modules.yaml` (restart to apply). A missing file loads all five.
 
 The server binds to `127.0.0.1` only.
 
@@ -72,6 +72,7 @@ enabled:
   - steamer
   - kickflip
   - prlooker
+typeToSearch: true   # optional; default true. Set false to disable type-anywhere Homepage search
 ```
 
 ## macOS menu bar

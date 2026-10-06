@@ -7,10 +7,12 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getTools, openDirectory, saveConfig } from "../api";
 import { buildMatcher, nextTileId, normalizeQuery, type NavDirection } from "../filter";
 import type { DirTool, HomepageConfig, Section, Shortcut, ToolsStatus } from "../types";
 import { isDirShortcut, isUrlShortcut } from "../types";
+import { setHomepageFilterReady, takeTypeToSearchSeed } from "../../../shell/typeToSearch";
 import { useToast } from "../../../shell/toast";
 
 function newId(): string {
@@ -258,9 +260,28 @@ export const LinksPage = forwardRef<
   const selectedIdRef = useRef(selectedId);
   const modalOpenRef = useRef(false);
   const { flash } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   queryRef.current = query;
   selectedIdRef.current = selectedId;
   modalOpenRef.current = modal !== null;
+
+  useEffect(() => {
+    setHomepageFilterReady(true);
+    return () => setHomepageFilterReady(false);
+  }, []);
+
+  useEffect(() => {
+    const fromState =
+      location.state && typeof location.state === "object" && "typeToSearch" in location.state
+        ? String((location.state as { typeToSearch?: string }).typeToSearch ?? "")
+        : "";
+    const seed = takeTypeToSearchSeed() || fromState;
+    if (!seed) return;
+    setQuery(seed);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    filterRef.current?.focus();
+  }, [location.key, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     void getTools()
@@ -639,6 +660,10 @@ export const LinksPage = forwardRef<
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Filter shortcuts — just start typing"
         aria-label="Filter shortcuts"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
       />
 
       {starredHits.length > 0 && (

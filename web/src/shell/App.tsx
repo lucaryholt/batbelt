@@ -3,6 +3,12 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "reac
 import logoUrl from "../../../src-tauri/icons/128x128.png";
 import { hostApi } from "./api";
 import { useToast } from "./toast";
+import {
+  appendTypeToSearchSeed,
+  isEditableTarget,
+  isHomepageFilterReady,
+  peekTypeToSearchSeed,
+} from "./typeToSearch";
 import type { ModuleDescriptor } from "./types";
 import { HomepageApp } from "../modules/homepage/App";
 import { KubefwdApp } from "../modules/kubefwd/App";
@@ -22,8 +28,17 @@ function modulePath(mod: ModuleDescriptor): string {
   return `/${mod.id}/${mod.pages[0]?.path ?? ""}`;
 }
 
+function digitFromEvent(event: KeyboardEvent): number | undefined {
+  const fromCode = /^Digit([1-9])$/.exec(event.code);
+  if (fromCode) return Number(fromCode[1]);
+  const n = Number(event.key);
+  if (Number.isInteger(n) && n >= 1 && n <= 9) return n;
+  return undefined;
+}
+
 export function App() {
   const [modules, setModules] = useState<ModuleDescriptor[]>([]);
+  const [typeToSearch, setTypeToSearch] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -33,23 +48,54 @@ export function App() {
   useEffect(() => {
     void hostApi
       .getModules()
-      .then((res) => setModules(res.modules))
+      .then((res) => {
+        setModules(res.modules);
+        setTypeToSearch(res.typeToSearch !== false);
+      })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoaded(true));
   }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-      const index = Number(event.key) - 1;
-      const mod = Number.isInteger(index) ? modules[index] : undefined;
-      if (!mod) return;
+      if (event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey) {
+        const pageIndex = (digitFromEvent(event) ?? 0) - 1;
+        const activeMod = modules.find(
+          (mod) => location.pathname === `/${mod.id}` || location.pathname.startsWith(`/${mod.id}/`),
+        );
+        const page = pageIndex >= 0 ? activeMod?.pages[pageIndex] : undefined;
+        if (!page || !activeMod) return;
+        event.preventDefault();
+        navigate(`/${activeMod.id}/${page.path}`);
+        return;
+      }
+
+      if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        const index = (digitFromEvent(event) ?? 0) - 1;
+        const mod = index >= 0 ? modules[index] : undefined;
+        if (!mod) return;
+        event.preventDefault();
+        navigate(modulePath(mod));
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.isComposing || event.key.length !== 1) return;
+      if (isEditableTarget(event.target)) return;
+      if (!typeToSearch) return;
+      const homepage = modules.find((mod) => mod.id === "homepage");
+      if (!homepage) return;
+      if (isHomepageFilterReady()) return;
+      if (event.key === " " && peekTypeToSearchSeed() === "") return;
       event.preventDefault();
-      navigate(modulePath(mod));
+      const seed = appendTypeToSearchSeed(event.key);
+      navigate(`/${homepage.id}/${homepage.pages[0]?.path ?? "links"}`, {
+        state: { typeToSearch: seed },
+      });
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modules, navigate]);
+  }, [modules, navigate, location.pathname, typeToSearch]);
 
   const first = modules[0];
   const active = modules.find((mod) => location.pathname === `/${mod.id}` || location.pathname.startsWith(`/${mod.id}/`));
@@ -75,13 +121,14 @@ export function App() {
                 {index < 9 && <span className="bb-nav-key">⌃{index + 1}</span>}
               </NavLink>
               {(active?.id === mod.id || location.pathname.startsWith(`/${mod.id}`)) &&
-                mod.pages.map((page) => (
+                mod.pages.map((page, pageIndex) => (
                   <NavLink
                     key={page.id}
                     to={`/${mod.id}/${page.path}`}
                     className={({ isActive }) => `bb-nav-page${isActive ? " active" : ""}`}
                   >
                     {page.label}
+                    {pageIndex < 9 && <span className="bb-nav-key">⌃⇧{pageIndex + 1}</span>}
                   </NavLink>
                 ))}
             </div>

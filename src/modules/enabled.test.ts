@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DEFAULT_MODULE_IDS } from "./catalog.js";
-import { modulesFilePath, parseEnabledIds, resolveEnabledIds } from "./enabled.js";
+import { modulesFilePath, parseEnabledIds, parseHostConfig, resolveEnabledIds, resolveHostConfig } from "./enabled.js";
 
 describe("enabled modules", () => {
   const prev = process.env.XDG_CONFIG_HOME;
@@ -53,5 +53,33 @@ describe("enabled modules", () => {
     expect(() => parseEnabledIds({ enabled: ["homepage", "homepage"] })).toThrow(
       "Duplicate module id: homepage",
     );
+  });
+
+  it("defaults typeToSearch to true when the key is omitted", () => {
+    expect(parseHostConfig({ enabled: ["homepage"] })).toEqual({
+      ids: ["homepage"],
+      typeToSearch: true,
+    });
+  });
+
+  it("accepts typeToSearch false", () => {
+    expect(parseHostConfig({ enabled: ["homepage"], typeToSearch: false })).toEqual({
+      ids: ["homepage"],
+      typeToSearch: false,
+    });
+  });
+
+  it("rejects a non-boolean typeToSearch", () => {
+    expect(() => parseHostConfig({ enabled: ["homepage"], typeToSearch: "yes" })).toThrow(
+      /typeToSearch must be a boolean/,
+    );
+  });
+
+  it("treats a missing file as typeToSearch true", async () => {
+    isolate();
+    await expect(resolveHostConfig()).resolves.toEqual({
+      ids: [...DEFAULT_MODULE_IDS],
+      typeToSearch: true,
+    });
   });
 });

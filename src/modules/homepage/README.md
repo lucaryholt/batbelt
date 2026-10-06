@@ -96,6 +96,7 @@ A GUI-launched Kitty has a bare `PATH`, and `kitten @ launch` runs the program d
 ## Keyboard
 
 - Just start typing anywhere on the page to filter — no need to click the filter box first. Modal fields and modifier chords (⌘/⌃/⌥) are left alone
+- With `typeToSearch: true` in `~/.config/batbelt/modules.yaml` (the default), the same keys from another module navigate to Links and seed the filter. Restart batbelt after changing that flag. The flag is ignored if Homepage is not enabled
 - Each whitespace-separated token must appear in the shortcut's label or section title, so `argo` surfaces the whole Argo section and `argo dev` keeps only its DEV shortcut
 - URLs and folder paths are searched only when nothing matches on names, so a host like `argo.stg.gwos.dev` does not make every environment a hit for `dev`. Queries such as `dags`, `github`, or `scripts` still find shortcuts by URL or path
 - While filtering, sections without a match are hidden and collapsed sections show their matches. Clearing the filter restores the saved `collapsed` state — filtering never writes to the YAML

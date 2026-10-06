@@ -64,9 +64,9 @@ nav.bb-nav {
   padding: 6px 8px;
 }
 .bb-nav-mod { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; color: var(--text); }
-.bb-nav-key { font-size: 10px; font-weight: 400; color: var(--muted); }
+.bb-nav-key { font-size: 10px; font-weight: 400; color: var(--muted); margin-left: auto; }
 .bb-nav-mod.active, .bb-nav-page.active { color: var(--accent); background: rgba(88, 166, 255, 0.08); }
-.bb-nav-page { padding-left: 16px; font-size: 12px; }
+.bb-nav-page { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-left: 16px; font-size: 12px; }
 .bb-nav-mod:hover, .bb-nav-page:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
 .bb-workspace {
   min-width: 0;

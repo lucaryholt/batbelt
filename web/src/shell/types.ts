@@ -12,4 +12,5 @@ export interface ModuleDescriptor {
 
 export interface ModulesResponse {
   modules: ModuleDescriptor[];
+  typeToSearch: boolean;
 }
