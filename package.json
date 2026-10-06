@@ -1,6 +1,6 @@
 {
   "name": "batbelt",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Modular localhost toolbox: homepage shortcuts, Kubernetes port-forwards, OpenBao secrets, and a GitHub PR inbox",
   "type": "module",
   "bin": {
