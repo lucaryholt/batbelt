@@ -1,4 +1,4 @@
-import { coerceConfig, type HomepageConfig, type ToolsStatus } from "./types";
+import { coerceConfig, type HomepageConfig } from "./types";
 
 async function parseJson<T>(res: Response): Promise<T> {
   const body = (await res.json()) as T & { error?: string };
@@ -28,20 +28,6 @@ export async function openConfig(): Promise<{ path: string }> {
   return parseJson(
     await fetch("/api/homepage/config/open", {
       method: "POST",
-    }),
-  );
-}
-
-export async function getTools(): Promise<ToolsStatus> {
-  return parseJson(await fetch("/api/homepage/tools"));
-}
-
-export async function openDirectory(id: string): Promise<{ path: string; fallback?: "kitty-window" }> {
-  return parseJson(
-    await fetch("/api/homepage/open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
     }),
   );
 }

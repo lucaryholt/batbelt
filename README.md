@@ -4,7 +4,7 @@
 
 Localhost toolbox with a shared UI shell. Modules:
 
-- **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of URL and folder shortcuts, plus a starred row above them
+- **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of URL shortcuts, plus a starred row above them
 - **[Kubefwd](src/modules/kubefwd/README.md)** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
 - **[Steamer](src/modules/steamer/README.md)** — Read-only OpenBao KV comparison with links to make changes in the OpenBao UI
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
@@ -20,7 +20,6 @@ The server binds to `127.0.0.1` only.
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/) on your `PATH` for Kubefwd and Kickflip
 - The [`bao`](https://openbao.org/docs/commands/) CLI on your `PATH` for Steamer
 - The [`gh`](https://cli.github.com/) CLI on your `PATH` for PR Looker
-- `code` / `pi` on `PATH` for Homepage folder shortcuts; Kitty tabs also work from an installed `kitty.app` without `kitten` on `PATH`
 - OIDC already enabled on each OpenBao instance, with `http://localhost:8250/oidc/callback` allowed as a redirect URI
 
 On macOS with [Homebrew](https://brew.sh), install `kubectl`, `bao` (formula `openbao`), and `gh`:
@@ -128,7 +127,7 @@ The DMG is currently unsigned and may trigger a macOS Gatekeeper warning. Before
 | Path | Contents |
 | --- | --- |
 | `~/.config/batbelt/modules.yaml` | Enabled modules and sidebar order (optional; missing means all five) |
-| `~/.config/batbelt/homepage/config.yaml` | Homepage sections, shortcuts, and Pi terminal |
+| `~/.config/batbelt/homepage/config.yaml` | Homepage sections and URL shortcuts |
 | `~/.config/batbelt/kubefwd.db` | Kubefwd services and settings |
 | `~/.config/batbelt/steamer/config.yaml` | Steamer environments |
 | `~/.config/batbelt/steamer/tokens/` | Per-environment OpenBao tokens (`0600`) |
@@ -143,7 +142,7 @@ npx tsx src/cli.ts --import-yaml ~/.kubefwd.yaml
 
 ## Modules
 
-- [Homepage](src/modules/homepage/README.md) — Links board with URL and folder tiles, a starred row, and a homepage-wide Pi terminal. YAML + UI CRUD; confirm deletes only.
+- [Homepage](src/modules/homepage/README.md) — Links board with URL tiles and a starred row. YAML + UI CRUD; confirm deletes only.
 - [Kubefwd](src/modules/kubefwd/README.md) — Services, Proxy, Port Checker, Explore. SQLite only; YAML is `--import-yaml`.
 - [Steamer](src/modules/steamer/README.md) — Read-only Secrets comparison + editable Settings. Secret changes open in OpenBao; settings saves are confirmed. OIDC callback on port `8250`.
 - [Kickflip](src/modules/kickflip/README.md) — Services tile grid. File-only YAML; first start seeds the old restarter lists.

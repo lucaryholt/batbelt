@@ -90,7 +90,6 @@ describe("homepage config", () => {
     isolate();
     const saved = await saveConfig({
       starred: [],
-      terminal: { kind: "terminal-app" },
       sections: [
         {
           id: "airflow",
@@ -102,7 +101,6 @@ describe("homepage config", () => {
       ],
     });
     expect(saved.starred).toEqual([]);
-    expect(saved.terminal).toEqual({ kind: "terminal-app" });
     expect(saved.sections[0].collapsed).toBe(true);
     expect(saved.sections[0].shortcuts[0]).toMatchObject({ kind: "url", label: "Dev" });
     expect(await loadConfig()).toEqual(saved);
@@ -119,7 +117,6 @@ describe("homepage config", () => {
       ],
     });
     expect(cfg.starred).toEqual([]);
-    expect(cfg.terminal).toEqual({ kind: "terminal-app" });
     expect(cfg.sections[0].shortcuts[0]).toEqual({
       id: "dev",
       kind: "url",
@@ -145,159 +142,31 @@ describe("homepage config", () => {
     expect(cfg.starred).toEqual(["prod", "dev"]);
   });
 
-  it("accepts a directory shortcut and keeps ~ in the stored path", () => {
-    const cfg = normalizeConfig({
-      sections: [
-        {
-          id: "projects",
-          title: "Projects",
-          shortcuts: [
-            { id: "p1", kind: "dir", label: "batbelt", path: "~/scripts/batbelt", tool: "code" },
-          ],
-        },
-      ],
-    });
-    expect(cfg.sections[0].shortcuts[0]).toEqual({
-      id: "p1",
-      kind: "dir",
-      label: "batbelt",
-      path: "~/scripts/batbelt",
-      tool: "code",
-    });
-  });
-
-  it("treats a path-only row without kind as a directory shortcut", () => {
-    const cfg = normalizeConfig({
-      sections: [
-        {
-          id: "projects",
-          title: "Projects",
-          shortcuts: [{ id: "p1", label: "batbelt", path: "/tmp/batbelt", tool: "pi" }],
-        },
-      ],
-    });
-    expect(cfg.sections[0].shortcuts[0]).toMatchObject({ kind: "dir", tool: "pi", path: "/tmp/batbelt" });
-  });
-
-  it("rejects a relative directory path", () => {
+  it("rejects folder shortcuts", () => {
     expect(() =>
       normalizeConfig({
         sections: [
           {
             id: "projects",
             title: "Projects",
-            shortcuts: [{ id: "p1", kind: "dir", label: "rel", path: "scripts/batbelt", tool: "code" }],
+            shortcuts: [{ id: "p1", kind: "dir", label: "project", path: "/tmp/project", tool: "code" }],
           },
         ],
       }),
-    ).toThrow(/absolute/i);
+    ).toThrow(/folder shortcuts are no longer supported/i);
   });
 
-  it("rejects a directory shortcut with an unknown tool", () => {
+  it("rejects legacy path-only folder shortcuts", () => {
     expect(() =>
       normalizeConfig({
         sections: [
           {
             id: "projects",
             title: "Projects",
-            shortcuts: [{ id: "p1", kind: "dir", label: "x", path: "/tmp/x", tool: "emacs" }],
+            shortcuts: [{ id: "p1", label: "project", path: "/tmp/project", tool: "pi" }],
           },
         ],
       }),
-    ).toThrow(/code or pi/i);
-  });
-
-  it("rejects a directory path containing NUL", () => {
-    expect(() =>
-      normalizeConfig({
-        sections: [
-          {
-            id: "projects",
-            title: "Projects",
-            shortcuts: [{ id: "p1", kind: "dir", label: "x", path: "/tmp/x\0oops", tool: "code" }],
-          },
-        ],
-      }),
-    ).toThrow(/NUL/i);
-  });
-
-  it("does not require the folder to exist at save time", () => {
-    expect(() =>
-      normalizeConfig({
-        sections: [
-          {
-            id: "projects",
-            title: "Projects",
-            shortcuts: [
-              { id: "p1", kind: "dir", label: "missing", path: "/definitely/not/here", tool: "code" },
-            ],
-          },
-        ],
-      }),
-    ).not.toThrow();
-  });
-
-  it("defaults a missing terminal to Terminal.app", () => {
-    const cfg = normalizeConfig({ sections: [] });
-    expect(cfg.terminal).toEqual({ kind: "terminal-app" });
-  });
-
-  it("accepts each terminal kind", () => {
-    expect(normalizeConfig({ terminal: { kind: "kitty-tab", listenOn: "unix:/tmp/mykitty" } }).terminal).toEqual({
-      kind: "kitty-tab",
-      listenOn: "unix:/tmp/mykitty",
-    });
-    expect(normalizeConfig({ terminal: { kind: "terminal-app" } }).terminal).toEqual({ kind: "terminal-app" });
-    expect(
-      normalizeConfig({
-        terminal: { kind: "custom", argv: ["wezterm", "cli", "spawn", "--cwd", "{path}", "--", "{cmd}"] },
-      }).terminal,
-    ).toEqual({
-      kind: "custom",
-      argv: ["wezterm", "cli", "spawn", "--cwd", "{path}", "--", "{cmd}"],
-    });
-  });
-
-  it("rewrites a cursor folder tool to code", () => {
-    const cfg = normalizeConfig({
-      sections: [
-        {
-          id: "projects",
-          title: "Projects",
-          shortcuts: [{ id: "p1", kind: "dir", label: "batbelt", path: "/tmp/batbelt", tool: "cursor" }],
-        },
-      ],
-    });
-    expect((cfg.sections[0].shortcuts[0] as { tool: string }).tool).toBe("code");
-  });
-
-  it("rewrites iterm-tab to Terminal.app", () => {
-    expect(normalizeConfig({ terminal: { kind: "iterm-tab" } }).terminal).toEqual({ kind: "terminal-app" });
-  });
-
-  it("rejects an unknown terminal kind", () => {
-    expect(() => normalizeConfig({ terminal: { kind: "warp" } })).toThrow(/terminal.kind/i);
-  });
-
-  it("rejects an empty custom argv", () => {
-    expect(() => normalizeConfig({ terminal: { kind: "custom", argv: [] } })).toThrow(/argv/i);
-  });
-
-  it("rejects a blank custom argv token", () => {
-    expect(() => normalizeConfig({ terminal: { kind: "custom", argv: ["kitty", "  "] } })).toThrow(/argv\[1]/);
-  });
-
-  it("allows starring a directory shortcut", () => {
-    const cfg = normalizeConfig({
-      starred: ["p1"],
-      sections: [
-        {
-          id: "projects",
-          title: "Projects",
-          shortcuts: [{ id: "p1", kind: "dir", label: "batbelt", path: "/tmp/batbelt", tool: "code" }],
-        },
-      ],
-    });
-    expect(cfg.starred).toEqual(["p1"]);
+    ).toThrow(/folder shortcuts are no longer supported/i);
   });
 });

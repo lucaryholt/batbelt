@@ -74,9 +74,5 @@ export function buildMatcher(sections: Section[], query: string): Matcher {
   if (named) return byName;
 
   return (shortcut, section) =>
-    everyTokenIn(`${shortcut.label} ${shortcutHaystack(shortcut)} ${section.title}`, tokens);
-}
-
-function shortcutHaystack(shortcut: Shortcut): string {
-  return shortcut.kind === "dir" ? shortcut.path : shortcut.url;
+    everyTokenIn(`${shortcut.label} ${shortcut.url} ${section.title}`, tokens);
 }
