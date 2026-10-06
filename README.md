@@ -1,6 +1,8 @@
+<img width="32" height="32" src="https://raw.githubusercontent.com/lucaryholt/batbelt/refs/heads/main/src-tauri/icons/32x32.png">
+
 # batbelt
 
-<img width="1089" height="807" alt="image" src="https://github.com/user-attachments/assets/6968bba2-3f94-4440-85b8-daca74834d82" />
+<img height="400" alt="image" src="https://github.com/user-attachments/assets/6968bba2-3f94-4440-85b8-daca74834d82" />
 
 Localhost toolbox with a shared UI shell. Modules:
 
