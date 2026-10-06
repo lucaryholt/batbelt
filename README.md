@@ -1,5 +1,7 @@
 # batbelt
 
+<img width="1089" height="807" alt="image" src="https://github.com/user-attachments/assets/6968bba2-3f94-4440-85b8-daca74834d82" />
+
 Localhost toolbox with a shared UI shell. Modules:
 
 - **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of URL and folder shortcuts, plus a starred row above them
