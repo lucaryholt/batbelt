@@ -40,3 +40,11 @@ npm run desktop:dev
 ```
 
 Node.js 20 or newer is required. Optional module CLIs (`kubectl`, `bao`, `gh`, `code`, `pi`, and Kitty tools) may be absent in development; keep missing-tool states graceful.
+
+## Releases
+
+- Run `npm run release -- patch|minor|major|X.Y.Z` only from a clean `main` synchronized with `origin/main`.
+- The release script synchronizes versions in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock`.
+- Releases require macOS, npm, Cargo/Tauri, Git, and an authenticated `gh` CLI. They run typechecking, tests, and the desktop build before committing or publishing.
+- The script creates `Release vX.Y.Z`, pushes the annotated tag, and uploads the unsigned DMG with GitHub-generated notes.
+- Do not rewrite release history after a push. If GitHub publication fails, use the retry command printed by the script.

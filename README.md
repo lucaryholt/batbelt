@@ -107,6 +107,22 @@ It prefers the `node` your shell resolves, but `better-sqlite3` is a native modu
 
 External links (Homepage shortcuts, OIDC on port `8250`) open in the system browser. On first launch the app enables a Login Item (`tauri-plugin-autostart`); manage it in **System Settings → General → Login Items**. Finder-launched apps often miss Homebrew/nvm; the wrapper prepends those to `PATH`. Closing the window does not quit: use **Quit** in the tray menu.
 
+### Release
+
+Create a desktop release from a clean, synchronized `main` branch:
+
+```bash
+npm run release -- patch       # or minor, major, or an exact version such as 1.2.3
+```
+
+The command requires macOS, Node.js/npm, Rust/Cargo, Xcode Command Line Tools, Git, and an authenticated GitHub CLI (`gh auth login`). It:
+
+1. Updates the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock`.
+2. Runs typechecking and tests, then builds the production Tauri application.
+3. Commits the version files as `Release vX.Y.Z`, creates and pushes the annotated `vX.Y.Z` tag, and uploads the generated DMG to GitHub Releases with generated notes.
+
+The DMG is currently unsigned and may trigger a macOS Gatekeeper warning. Before the release commit, failures restore the original version files. If publishing fails after the commit or tag is pushed, the script prints safe retry commands; do not rewrite the pushed release history.
+
 ## Data
 
 | Path | Contents |
