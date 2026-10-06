@@ -98,7 +98,7 @@ describe("prlooker gh", () => {
       }
       const reason = args.includes("--assignee=@me")
         ? "assigned"
-        : args.some((arg) => arg.startsWith("review-requested:"))
+        : args.some((arg) => arg.startsWith("--review-requested=") && arg !== "--review-requested=@me")
           ? "team"
           : "review";
       return {
@@ -118,6 +118,6 @@ describe("prlooker gh", () => {
     expect(inbox.viewer).toBe("ada");
     expect(inbox.items).toHaveLength(3);
     expect(calls.filter((args) => args[0] === "search")).toHaveLength(5);
-    expect(calls.some((args) => args.includes("review-requested:acme/core"))).toBe(true);
+    expect(calls.some((args) => args.includes("--review-requested=acme/core"))).toBe(true);
   });
 });
