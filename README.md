@@ -98,10 +98,10 @@ It prefers the `node` your shell resolves, but `better-sqlite3` is a native modu
 
 | Control | Action |
 | --- | --- |
-| Menu bar icon (left click) | Toggle the popover (top centre of the active screen) |
+| Menu bar icon (left click) | Toggle the popover (top centre of the screen containing the pointer) |
 | Menu bar icon (right click) | Open the tray menu |
 | Tray **Open** | Same toggle |
-| ⌘⌥⇧B | Same toggle |
+| ⌘⌥⇧B | Same toggle; placement uses the screen containing the pointer when pressed |
 | **Pop out** (tray menu) | Same window, title bar, resizable, Dock icon |
 | Popover edge | Resize the attached window (minimum 480×400) |
 | Window close | Return to menu bar (does not quit) |

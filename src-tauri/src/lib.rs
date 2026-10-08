@@ -279,7 +279,10 @@ fn find_running_port() -> Option<u16> {
 }
 
 fn is_loopback(parsed: &url::Url) -> bool {
-    matches!(parsed.host_str(), Some("127.0.0.1") | Some("localhost") | Some("::1"))
+    matches!(
+        parsed.host_str(),
+        Some("127.0.0.1") | Some("localhost") | Some("::1")
+    )
 }
 
 fn should_stay_in_webview(raw: &str) -> bool {
@@ -307,24 +310,45 @@ fn mark_ignore_blur(app: &AppHandle) {
     }
 }
 
-/// Anchors the popover to the top centre of the active screen, just under the
-/// menu bar, regardless of where the tray icon sits.
+fn top_center_position(
+    area_position: PhysicalPosition<i32>,
+    area_width: u32,
+    window_width: u32,
+    scale_factor: f64,
+) -> PhysicalPosition<i32> {
+    let margin = (POPOVER_TOP_MARGIN * scale_factor).round() as i32;
+    let x = area_position.x + (area_width as i32 - window_width as i32) / 2;
+    PhysicalPosition::new(x, area_position.y + margin)
+}
+
+/// Anchors the popover to the top centre of the screen under the pointer, just
+/// under the menu bar, regardless of where the hidden window previously sat.
 fn position_top_center(win: &WebviewWindow) {
-    let monitor = match win.current_monitor() {
-        Ok(Some(monitor)) => monitor,
-        _ => match win.primary_monitor() {
+    let cursor_monitor = win
+        .cursor_position()
+        .ok()
+        .and_then(|cursor| win.monitor_from_point(cursor.x, cursor.y).ok().flatten());
+    let monitor = match cursor_monitor {
+        Some(monitor) => monitor,
+        None => match win.current_monitor() {
             Ok(Some(monitor)) => monitor,
-            _ => return,
+            _ => match win.primary_monitor() {
+                Ok(Some(monitor)) => monitor,
+                _ => return,
+            },
         },
     };
     let Ok(size) = win.outer_size() else {
         return;
     };
     let area = monitor.work_area();
-    let margin = (POPOVER_TOP_MARGIN * monitor.scale_factor()).round() as i32;
-    let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
-    let y = area.position.y + margin;
-    let _ = win.set_position(PhysicalPosition::new(x, y));
+    let position = top_center_position(
+        area.position,
+        area.size.width,
+        size.width,
+        monitor.scale_factor(),
+    );
+    let _ = win.set_position(position);
 }
 
 fn show_attached_popover(app: &AppHandle) {
@@ -332,6 +356,10 @@ fn show_attached_popover(app: &AppHandle) {
         return;
     };
     mark_ignore_blur(app);
+    // Moving a visible NSWindow between displays can leave a stale frame on
+    // its previous display until the next compositor pass. Keep it hidden
+    // while repositioning, even if macOS still considers it visible.
+    let _ = win.hide();
     position_top_center(&win);
     let _ = win.show();
     let _ = win.set_focus();
@@ -690,4 +718,25 @@ pub fn run() {
                 stop_child(app);
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn centers_on_a_monitor_with_a_negative_origin() {
+        assert_eq!(
+            top_center_position(PhysicalPosition::new(-1920, 24), 1920, 1080, 1.0),
+            PhysicalPosition::new(-1500, 32),
+        );
+    }
+
+    #[test]
+    fn scales_the_top_margin_for_retina_displays() {
+        assert_eq!(
+            top_center_position(PhysicalPosition::new(0, 48), 3024, 2160, 2.0),
+            PhysicalPosition::new(432, 64),
+        );
+    }
 }
