@@ -10,15 +10,17 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { saveConfig } from "../api";
 import {
-  buildMatcher,
   nextTileId,
   normalizeQuery,
   searchModuleActions,
   searchModulePages,
+  searchShortcuts,
+  shortcutUsageKey,
   type ModuleActionResult,
   type ModulePageResult,
   type NavDirection,
 } from "../filter";
+import { loadUsage, recordUsage } from "../usage";
 import type { HomepageConfig, Section, Shortcut } from "../types";
 import { setHomepageFilterReady, takeTypeToSearchSeed } from "../../../shell/typeToSearch";
 import type { ModuleDescriptor } from "../../../shell/types";
@@ -278,6 +280,7 @@ export const LinksPage = forwardRef<
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [usage, setUsage] = useState(loadUsage);
   const filterRef = useRef<HTMLInputElement>(null);
   const tileRefs = useRef(new Map<string, HTMLElement>());
   const navIdsRef = useRef<string[]>([]);
@@ -481,16 +484,35 @@ export const LinksPage = forwardRef<
   }
 
   const q = normalizeQuery(query);
-  const actionHits = searchModuleActions(modules, query);
-  const pageHits = searchModulePages(modules, query);
-  const matches = buildMatcher(config.sections, query);
+  const actionHits = searchModuleActions(modules, query, usage.counts);
+  const pageHits = searchModulePages(modules, query, usage.counts);
+  const shortcutHits = searchShortcuts(config.sections, query, usage.counts);
+  const shortcutScores = new Map(shortcutHits.map((hit) => [hit.shortcut.id, hit]));
   const allStarred = resolveStarred(config);
   const pinned = new Set(allStarred.map((hit) => hit.shortcut.id));
-  const starredHits = allStarred.filter((hit) => matches(hit.shortcut, hit.section));
+  const starredHits =
+    q === ""
+      ? allStarred
+      : allStarred
+          .filter((hit) => shortcutScores.has(hit.shortcut.id))
+          .sort(
+            (left, right) =>
+              (shortcutScores.get(right.shortcut.id)?.score ?? 0) -
+              (shortcutScores.get(left.shortcut.id)?.score ?? 0),
+          );
   const visibleSections = config.sections
     .map((section) => ({
       section,
-      shortcuts: section.shortcuts.filter((shortcut) => matches(shortcut, section)),
+      shortcuts:
+        q === ""
+          ? section.shortcuts
+          : section.shortcuts
+              .filter((shortcut) => shortcutScores.has(shortcut.id))
+              .sort(
+                (left, right) =>
+                  (shortcutScores.get(right.id)?.score ?? 0) -
+                  (shortcutScores.get(left.id)?.score ?? 0),
+              ),
       expanded: q !== "" || !section.collapsed,
     }))
     .filter((entry) => q === "" || entry.shortcuts.length > 0);
@@ -536,12 +558,18 @@ export const LinksPage = forwardRef<
     setSelectedId(null);
   }
 
+  function trackUsage(key: string) {
+    setUsage((current) => recordUsage(current, key));
+  }
+
   function handleOpen(shortcut: Shortcut) {
+    trackUsage(shortcutUsageKey(shortcut.id));
     resetFilter();
   }
 
   async function runModuleAction(result: ModuleActionResult) {
     if (runningActionId) return;
+    trackUsage(result.id);
     setRunningActionId(result.id);
     try {
       await hostApi.runAction(result.action);
@@ -709,6 +737,7 @@ export const LinksPage = forwardRef<
                 selected={selectedId === result.id}
                 tileRef={registerTile(result.id)}
                 onOpen={() => {
+                  trackUsage(result.id);
                   resetFilter();
                   navigate(result.path);
                 }}

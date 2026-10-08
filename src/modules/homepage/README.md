@@ -49,10 +49,12 @@ A shortcut without `kind` that has a `url` is treated as `kind: url`. Folder sho
 ## Keyboard
 
 - Just start typing anywhere on the page to search shortcuts, pages, and advertised actions in every other enabled module — no need to click the filter box first. Modal fields and modifier chords (⌘/⌃/⌥) are left alone
+- Search is fuzzy and typo-tolerant. Within each result group, match quality is combined with a capped boost based on how often that browser profile has opened or run the result; exact and strong matches remain dominant
+- Usage counts for shortcuts, pages, and actions are kept in versioned browser `localStorage`, not Homepage YAML or server data
 - With `typeToSearch: true` in `~/.config/batbelt/modules.yaml` (the default), the same keys from another module navigate to Links and seed the filter. Restart batbelt after changing that flag. The flag is ignored if Homepage is not enabled
 - Module pages match their module title/id and page label/id/path. Results follow sidebar and page order; Homepage → Links is omitted because it is already open
 - Actions match their module, label, description, and keywords. Selecting one runs its same-origin Batbelt API endpoint immediately and reports success or failure
-- Each whitespace-separated token must appear in the shortcut's label or section title, so `argo` surfaces the whole Argo section and `argo dev` keeps only its DEV shortcut
+- Each whitespace-separated token must fuzzy-match the shortcut's label or section title, so `argo` surfaces the whole Argo section and `argo dev` keeps its closest DEV shortcuts
 - URLs are searched only when nothing matches on names, so a host like `argo.stg.example.dev` does not make every environment a hit for `dev`. Queries such as `dags` or `github` still find shortcuts by URL
 - While filtering, sections without a match are hidden and collapsed sections show their matches. Clearing the filter restores the saved `collapsed` state — filtering never writes to the YAML
 - Arrow keys move the highlight across the grid as it looks on screen. A starred shortcut is only visited in the **Starred** row; its copy inside the section is skipped
