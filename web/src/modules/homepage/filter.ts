@@ -66,6 +66,42 @@ export interface ModulePageResult {
   path: string;
 }
 
+export interface ModuleActionResult {
+  id: string;
+  moduleId: string;
+  moduleTitle: string;
+  action: ModuleDescriptor["actions"][number];
+}
+
+export function searchModuleActions(
+  modules: ModuleDescriptor[],
+  query: string,
+): ModuleActionResult[] {
+  const tokens = normalizeQuery(query).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  return modules.flatMap((module) => {
+    if (module.id === "homepage") return [];
+    return module.actions.flatMap((action) => {
+      const searchable = [
+        module.title,
+        module.id,
+        action.label,
+        action.id,
+        action.description,
+        ...(action.keywords ?? []),
+      ].join(" ");
+      if (!everyTokenIn(searchable, tokens)) return [];
+      return [{
+        id: `action:${module.id}:${action.id}`,
+        moduleId: module.id,
+        moduleTitle: module.title,
+        action,
+      }];
+    });
+  });
+}
+
 export function searchModulePages(
   modules: ModuleDescriptor[],
   query: string,

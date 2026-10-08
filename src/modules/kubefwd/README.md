@@ -40,6 +40,8 @@ Live status is Server-Sent Events on `/api/kubefwd/state`. `--debug` writes kube
 
 `--default` starts services with `selected_by_default`. `--default-proxy` does the same for proxy services.
 
+Kubefwd advertises **Start default services** to Homepage search. Searching for `start defaults` and selecting that action immediately calls the existing start-defaults API and reports the result.
+
 ## YAML import schema
 
 Same fields as standalone kubefwd. `presets` are stored but unused. `alternative_contexts` round-trip in SQLite; there is no switch UI.

@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { createHostApp } from "./index.js";
+import { toDescriptor } from "../modules/types.js";
+import { kubefwdModule } from "../modules/kubefwd/index.js";
+
+describe("host module metadata", () => {
+  it("exposes the advertised Kubefwd action contract", () => {
+    expect(toDescriptor(kubefwdModule)).toMatchObject({
+      id: "kubefwd",
+      actions: [{
+        id: "start-default-services",
+        label: "Start default services",
+        method: "POST",
+        path: "/api/kubefwd/services/start-defaults",
+        successMessage: "Started default Kubefwd services.",
+      }],
+    });
+  });
+
+  it("defaults actions to an empty collection", () => {
+    expect(toDescriptor({
+      id: "example",
+      title: "Example",
+      pages: [],
+      createRoutes: () => createHostApp(),
+    }).actions).toEqual([]);
+  });
+});
 
 describe("host update endpoint", () => {
   it("returns the checker response contract", async () => {

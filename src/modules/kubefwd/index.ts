@@ -17,6 +17,26 @@ class KubefwdModule implements BatbeltModule {
     { id: "ports", label: "Port Checker", path: "ports" },
     { id: "explore", label: "Explore", path: "explore" },
   ];
+  readonly actions = [
+    {
+      id: "start-default-services",
+      label: "Start default services",
+      description: "Start Kubefwd services marked selected_by_default.",
+      keywords: ["start", "defaults", "port forwards"],
+      method: "POST" as const,
+      path: "/api/kubefwd/services/start-defaults",
+      successMessage: "Started default Kubefwd services.",
+    },
+    {
+      id: "start-default-proxies",
+      label: "Start default proxies",
+      description: "Start Kubefwd proxies marked selected_by_default.",
+      keywords: ["start", "defaults", "port forwards"],
+      method: "POST" as const,
+      path: "/api/kubefwd/proxy-services/start-defaults",
+      successMessage: "Started default Kubefwd proxies.",
+    }
+  ];
 
   private app: App | null = null;
   private sqlite: SqliteConfigStore | undefined;

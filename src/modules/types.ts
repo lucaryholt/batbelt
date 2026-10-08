@@ -6,6 +6,16 @@ export interface ModulePage {
   path: string;
 }
 
+export interface ModuleAction {
+  id: string;
+  label: string;
+  description: string;
+  keywords?: string[];
+  method: "POST";
+  path: string;
+  successMessage: string;
+}
+
 export interface ModuleContext {
   configDir: string;
   port: number;
@@ -21,6 +31,7 @@ export interface BatbeltModule {
   id: string;
   title: string;
   pages: ModulePage[];
+  actions?: ModuleAction[];
   createRoutes(): Hono;
   start?(ctx: ModuleContext): Promise<void>;
   stop?(): Promise<void>;
@@ -30,8 +41,9 @@ export interface ModuleDescriptor {
   id: string;
   title: string;
   pages: ModulePage[];
+  actions: ModuleAction[];
 }
 
 export function toDescriptor(mod: BatbeltModule): ModuleDescriptor {
-  return { id: mod.id, title: mod.title, pages: mod.pages };
+  return { id: mod.id, title: mod.title, pages: mod.pages, actions: mod.actions ?? [] };
 }

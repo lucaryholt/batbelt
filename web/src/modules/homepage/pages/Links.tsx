@@ -13,13 +13,17 @@ import {
   buildMatcher,
   nextTileId,
   normalizeQuery,
+  searchModuleActions,
   searchModulePages,
+  type ModuleActionResult,
   type ModulePageResult,
   type NavDirection,
 } from "../filter";
 import type { HomepageConfig, Section, Shortcut } from "../types";
 import { setHomepageFilterReady, takeTypeToSearchSeed } from "../../../shell/typeToSearch";
 import type { ModuleDescriptor } from "../../../shell/types";
+import { hostApi } from "../../../shell/api";
+import { useToast } from "../../../shell/toast";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -216,6 +220,34 @@ function ModulePageTile({
   );
 }
 
+function ModuleActionTile({
+  result,
+  pending,
+  selected,
+  tileRef,
+  onRun,
+}: {
+  result: ModuleActionResult;
+  pending: boolean;
+  selected?: boolean;
+  tileRef: (el: HTMLElement | null) => void;
+  onRun: () => void;
+}) {
+  return (
+    <button
+      ref={tileRef as (el: HTMLButtonElement | null) => void}
+      type="button"
+      className={`shortcut-tile module-action-tile${selected ? " selected" : ""}`}
+      aria-selected={selected}
+      disabled={pending}
+      onClick={onRun}
+    >
+      <span className="shortcut-label">{pending ? "Running…" : result.action.label}</span>
+      <span className="muted">{result.moduleTitle} · {result.action.description}</span>
+    </button>
+  );
+}
+
 type Modal =
   | { kind: "section"; section?: Section }
   | { kind: "shortcut"; sectionId: string; shortcut?: Shortcut }
@@ -245,6 +277,7 @@ export const LinksPage = forwardRef<
   const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const tileRefs = useRef(new Map<string, HTMLElement>());
   const navIdsRef = useRef<string[]>([]);
@@ -253,6 +286,7 @@ export const LinksPage = forwardRef<
   const modalOpenRef = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { flash } = useToast();
   queryRef.current = query;
   selectedIdRef.current = selectedId;
   modalOpenRef.current = modal !== null;
@@ -447,6 +481,7 @@ export const LinksPage = forwardRef<
   }
 
   const q = normalizeQuery(query);
+  const actionHits = searchModuleActions(modules, query);
   const pageHits = searchModulePages(modules, query);
   const matches = buildMatcher(config.sections, query);
   const allStarred = resolveStarred(config);
@@ -460,11 +495,15 @@ export const LinksPage = forwardRef<
     }))
     .filter((entry) => q === "" || entry.shortcuts.length > 0);
   const noMatches =
-    q !== "" && pageHits.length === 0 && starredHits.length === 0 && visibleSections.length === 0;
+    q !== "" && actionHits.length === 0 && pageHits.length === 0 && starredHits.length === 0 && visibleSections.length === 0;
 
-  /** Keyboard order visits pages first, then each shortcut once. */
+  /** Keyboard order visits actions, pages, then each shortcut once. */
   const navIds: string[] = [];
   const navSeen = new Set<string>();
+  for (const result of actionHits) {
+    navSeen.add(result.id);
+    navIds.push(result.id);
+  }
   for (const result of pageHits) {
     navSeen.add(result.id);
     navIds.push(result.id);
@@ -499,6 +538,19 @@ export const LinksPage = forwardRef<
 
   function handleOpen(shortcut: Shortcut) {
     resetFilter();
+  }
+
+  async function runModuleAction(result: ModuleActionResult) {
+    if (runningActionId) return;
+    setRunningActionId(result.id);
+    try {
+      await hostApi.runAction(result.action);
+      flash(result.action.successMessage);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : String(err), true);
+    } finally {
+      setRunningActionId(null);
+    }
   }
 
   const navKey = navIds.join("|");
@@ -627,6 +679,24 @@ export const LinksPage = forwardRef<
         autoCapitalize="off"
         spellCheck={false}
       />
+
+      {actionHits.length > 0 && (
+        <div className="module-actions-block">
+          <h2 className="starred-heading">Batbelt actions</h2>
+          <div className="shortcut-grid">
+            {actionHits.map((result) => (
+              <ModuleActionTile
+                key={result.id}
+                result={result}
+                pending={runningActionId === result.id}
+                selected={selectedId === result.id}
+                tileRef={registerTile(result.id)}
+                onRun={() => void runModuleAction(result)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {pageHits.length > 0 && (
         <div className="module-pages-block">
