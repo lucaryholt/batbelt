@@ -16,6 +16,8 @@ Localhost toolbox with a shared UI shell. Modules:
 
 The server binds to `127.0.0.1` only.
 
+Batbelt checks the repository's latest stable GitHub release at startup and every six hours. When a newer version is available, the shared UI shows a persistent link to its release page. Checks use GitHub's public API, require no authentication, and fail silently when offline or rate-limited.
+
 ## Requirements
 
 - Node.js 20+

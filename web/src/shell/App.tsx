@@ -9,7 +9,7 @@ import {
   isHomepageFilterReady,
   peekTypeToSearchSeed,
 } from "./typeToSearch";
-import type { ModuleDescriptor } from "./types";
+import type { ModuleDescriptor, UpdateStatus } from "./types";
 import { HomepageApp } from "../modules/homepage/App";
 import { KubefwdApp } from "../modules/kubefwd/App";
 import { SteamerApp } from "../modules/steamer/App";
@@ -23,6 +23,7 @@ const MODULE_APPS: Record<string, ComponentType> = {
   kickflip: KickflipApp,
   prlooker: PrlookerApp,
 };
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 function modulePath(mod: ModuleDescriptor): string {
   return `/${mod.id}/${mod.pages[0]?.path ?? ""}`;
@@ -41,6 +42,7 @@ export function App() {
   const [typeToSearch, setTypeToSearch] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -54,6 +56,24 @@ export function App() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const check = () => {
+      void hostApi
+        .getUpdate()
+        .then((status) => {
+          if (active) setUpdateStatus(status);
+        })
+        .catch(() => undefined);
+    };
+    check();
+    const interval = window.setInterval(check, UPDATE_CHECK_INTERVAL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -137,6 +157,14 @@ export function App() {
       </aside>
       <div className="bb-workspace">
         {error && <div className="bb-banner">{error}</div>}
+        {updateStatus?.update && (
+          <div className="bb-update-banner">
+            batbelt {updateStatus.update.version} is available (running {updateStatus.currentVersion}).
+            <a href={updateStatus.update.url} target="_blank" rel="noopener noreferrer">
+              View release
+            </a>
+          </div>
+        )}
         <Routes>
           <Route
             path="/"

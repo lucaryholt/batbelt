@@ -1,4 +1,4 @@
-import type { ModulesResponse } from "./types";
+import type { ModulesResponse, UpdateStatus } from "./types";
 
 async function json<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -12,4 +12,5 @@ async function json<T>(path: string): Promise<T> {
 export const hostApi = {
   getModules: () => json<ModulesResponse>("/api/modules"),
   getHealth: () => json<{ ok: boolean; host: string }>("/api/health"),
+  getUpdate: () => json<UpdateStatus>("/api/update"),
 };

@@ -6,6 +6,10 @@ import { Hono } from "hono";
 import { getHostModulesConfig } from "../modules/enabled.js";
 import { getModules } from "../modules/registry.js";
 import { toDescriptor } from "../modules/types.js";
+import { UpdateChecker } from "../update-check.js";
+import { createRequire } from "node:module";
+
+const packageJson = createRequire(import.meta.url)("../../package.json") as { version: string };
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -30,7 +34,9 @@ function webRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist", "web");
 }
 
-export function createHostApp(): Hono {
+export function createHostApp(
+  updateChecker: Pick<UpdateChecker, "getStatus"> = new UpdateChecker(packageJson.version),
+): Hono {
   const app = new Hono();
 
   app.get("/api/health", (c) => {
@@ -43,6 +49,8 @@ export function createHostApp(): Hono {
       typeToSearch: getHostModulesConfig().typeToSearch,
     });
   });
+
+  app.get("/api/update", async (c) => c.json(await updateChecker.getStatus()));
 
   for (const mod of getModules()) {
     app.route(`/api/${mod.id}`, mod.createRoutes());

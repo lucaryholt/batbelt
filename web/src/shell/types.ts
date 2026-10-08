@@ -14,3 +14,12 @@ export interface ModulesResponse {
   modules: ModuleDescriptor[];
   typeToSearch: boolean;
 }
+
+export interface UpdateStatus {
+  currentVersion: string;
+  update: {
+    version: string;
+    url: string;
+    publishedAt: string | null;
+  } | null;
+}
