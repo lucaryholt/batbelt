@@ -4,9 +4,10 @@ import { getConfig, openConfig } from "./api";
 import { LinksPage, type LinksPageHandle } from "./pages/Links";
 import { emptyConfig, type HomepageConfig } from "./types";
 import { useToast } from "../../shell/toast";
+import type { ModuleDescriptor } from "../../shell/types";
 import "./homepage.css";
 
-export function HomepageApp() {
+export function HomepageApp({ modules }: { modules: ModuleDescriptor[] }) {
   const [config, setConfig] = useState<HomepageConfig>(emptyConfig());
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -54,7 +55,10 @@ export function HomepageApp() {
         {ready ? (
           <Routes>
             <Route path="/" element={<Navigate to="links" replace />} />
-            <Route path="links" element={<LinksPage ref={linksRef} config={config} onChange={setConfig} />} />
+            <Route
+              path="links"
+              element={<LinksPage ref={linksRef} config={config} modules={modules} onChange={setConfig} />}
+            />
           </Routes>
         ) : (
           <p className="muted">Loading…</p>

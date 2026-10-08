@@ -48,11 +48,12 @@ A shortcut without `kind` that has a `url` is treated as `kind: url`. Folder sho
 
 ## Keyboard
 
-- Just start typing anywhere on the page to filter — no need to click the filter box first. Modal fields and modifier chords (⌘/⌃/⌥) are left alone
+- Just start typing anywhere on the page to search shortcuts and pages in every other enabled module — no need to click the filter box first. Modal fields and modifier chords (⌘/⌃/⌥) are left alone
 - With `typeToSearch: true` in `~/.config/batbelt/modules.yaml` (the default), the same keys from another module navigate to Links and seed the filter. Restart batbelt after changing that flag. The flag is ignored if Homepage is not enabled
+- Module pages match their module title/id and page label/id/path. Results follow sidebar and page order; Homepage → Links is omitted because it is already open
 - Each whitespace-separated token must appear in the shortcut's label or section title, so `argo` surfaces the whole Argo section and `argo dev` keeps only its DEV shortcut
 - URLs are searched only when nothing matches on names, so a host like `argo.stg.example.dev` does not make every environment a hit for `dev`. Queries such as `dags` or `github` still find shortcuts by URL
 - While filtering, sections without a match are hidden and collapsed sections show their matches. Clearing the filter restores the saved `collapsed` state — filtering never writes to the YAML
 - Arrow keys move the highlight across the grid as it looks on screen. A starred shortcut is only visited in the **Starred** row; its copy inside the section is skipped
-- **Enter** opens the highlighted shortcut (new tab or local launch), **Backspace** deletes the last character, **Escape** clears the filter
-- Opening a shortcut, hiding the window, or switching away clears the filter so the next search starts empty
+- **Enter** opens the highlighted shortcut in a new tab or navigates to the highlighted Batbelt page, **Backspace** deletes the last character, **Escape** clears the filter
+- Opening a result, hiding the window, or switching away clears the filter so the next search starts empty

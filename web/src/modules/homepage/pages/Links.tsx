@@ -9,9 +9,17 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { saveConfig } from "../api";
-import { buildMatcher, nextTileId, normalizeQuery, type NavDirection } from "../filter";
+import {
+  buildMatcher,
+  nextTileId,
+  normalizeQuery,
+  searchModulePages,
+  type ModulePageResult,
+  type NavDirection,
+} from "../filter";
 import type { HomepageConfig, Section, Shortcut } from "../types";
 import { setHomepageFilterReady, takeTypeToSearchSeed } from "../../../shell/typeToSearch";
+import type { ModuleDescriptor } from "../../../shell/types";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -180,6 +188,34 @@ function ShortcutTile({
   );
 }
 
+function ModulePageTile({
+  result,
+  selected,
+  tileRef,
+  onOpen,
+}: {
+  result: ModulePageResult;
+  selected?: boolean;
+  tileRef: (el: HTMLElement | null) => void;
+  onOpen: () => void;
+}) {
+  return (
+    <a
+      ref={tileRef as (el: HTMLAnchorElement | null) => void}
+      className={`shortcut-tile module-page-tile${selected ? " selected" : ""}`}
+      href={result.path}
+      aria-selected={selected}
+      onClick={(event) => {
+        event.preventDefault();
+        onOpen();
+      }}
+    >
+      <span className="shortcut-label">{result.pageLabel}</span>
+      <span className="muted">{result.moduleTitle}</span>
+    </a>
+  );
+}
+
 type Modal =
   | { kind: "section"; section?: Section }
   | { kind: "shortcut"; sectionId: string; shortcut?: Shortcut }
@@ -194,9 +230,10 @@ export const LinksPage = forwardRef<
   LinksPageHandle,
   {
     config: HomepageConfig;
+    modules: ModuleDescriptor[];
     onChange: (next: HomepageConfig) => void;
   }
->(function LinksPage({ config, onChange }, ref) {
+>(function LinksPage({ config, modules, onChange }, ref) {
   const [modal, setModal] = useState<Modal | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -410,6 +447,7 @@ export const LinksPage = forwardRef<
   }
 
   const q = normalizeQuery(query);
+  const pageHits = searchModulePages(modules, query);
   const matches = buildMatcher(config.sections, query);
   const allStarred = resolveStarred(config);
   const pinned = new Set(allStarred.map((hit) => hit.shortcut.id));
@@ -421,11 +459,16 @@ export const LinksPage = forwardRef<
       expanded: q !== "" || !section.collapsed,
     }))
     .filter((entry) => q === "" || entry.shortcuts.length > 0);
-  const noMatches = q !== "" && starredHits.length === 0 && visibleSections.length === 0;
+  const noMatches =
+    q !== "" && pageHits.length === 0 && starredHits.length === 0 && visibleSections.length === 0;
 
-  /** Keyboard order visits each shortcut once: starred hits first, then the rest. */
+  /** Keyboard order visits pages first, then each shortcut once. */
   const navIds: string[] = [];
   const navSeen = new Set<string>();
+  for (const result of pageHits) {
+    navSeen.add(result.id);
+    navIds.push(result.id);
+  }
   for (const hit of starredHits) {
     if (navSeen.has(hit.shortcut.id)) continue;
     navSeen.add(hit.shortcut.id);
@@ -577,13 +620,33 @@ export const LinksPage = forwardRef<
         className="shortcut-filter"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Filter shortcuts — just start typing"
-        aria-label="Filter shortcuts"
+        placeholder="Search shortcuts and pages — just start typing"
+        aria-label="Search shortcuts and Batbelt pages"
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
       />
+
+      {pageHits.length > 0 && (
+        <div className="module-pages-block">
+          <h2 className="starred-heading">Batbelt pages</h2>
+          <div className="shortcut-grid">
+            {pageHits.map((result) => (
+              <ModulePageTile
+                key={result.id}
+                result={result}
+                selected={selectedId === result.id}
+                tileRef={registerTile(result.id)}
+                onOpen={() => {
+                  resetFilter();
+                  navigate(result.path);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {starredHits.length > 0 && (
         <div className="starred-block">
@@ -615,7 +678,7 @@ export const LinksPage = forwardRef<
       {noMatches && (
         <section className="card">
           <p>
-            No shortcuts match <strong>{query.trim()}</strong>.
+            No shortcuts or pages match <strong>{query.trim()}</strong>.
           </p>
         </section>
       )}

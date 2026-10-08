@@ -172,7 +172,8 @@
   outline: none;
   border-color: var(--accent);
 }
-.homepage-app .starred-block {
+.homepage-app .starred-block,
+.homepage-app .module-pages-block {
   padding: 0 2px 4px;
 }
 .homepage-app .starred-heading {
@@ -182,8 +183,16 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.homepage-app .starred-block .shortcut-grid {
+.homepage-app .starred-block .shortcut-grid,
+.homepage-app .module-pages-block .shortcut-grid {
   margin-top: 10px;
+}
+.homepage-app .module-page-tile {
+  min-height: 64px;
+  background: rgba(88, 166, 255, 0.05);
+}
+.homepage-app .module-page-tile .muted {
+  color: var(--muted);
 }
 .homepage-app .shortcut-tile-head {
   display: flex;

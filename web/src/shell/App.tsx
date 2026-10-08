@@ -17,7 +17,6 @@ import { KickflipApp } from "../modules/kickflip/App";
 import { PrlookerApp } from "../modules/prlooker/App";
 
 const MODULE_APPS: Record<string, ComponentType> = {
-  homepage: HomepageApp,
   kubefwd: KubefwdApp,
   steamer: SteamerApp,
   kickflip: KickflipApp,
@@ -181,6 +180,15 @@ export function App() {
             }
           />
           {modules.map((mod) => {
+            if (mod.id === "homepage") {
+              return (
+                <Route
+                  key={mod.id}
+                  path={`/${mod.id}/*`}
+                  element={<HomepageApp modules={modules} />}
+                />
+              );
+            }
             const ModuleApp = MODULE_APPS[mod.id];
             if (!ModuleApp) return null;
             return <Route key={mod.id} path={`/${mod.id}/*`} element={<ModuleApp />} />;

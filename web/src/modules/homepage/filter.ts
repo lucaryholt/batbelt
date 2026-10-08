@@ -1,4 +1,5 @@
 import type { Section, Shortcut } from "./types";
+import type { ModuleDescriptor } from "../../shell/types";
 
 export function normalizeQuery(query: string): string {
   return query.trim().toLowerCase();
@@ -54,6 +55,40 @@ export type Matcher = (shortcut: Shortcut, section: Section) => boolean;
 function everyTokenIn(haystack: string, tokens: string[]): boolean {
   const text = haystack.toLowerCase();
   return tokens.every((token) => text.includes(token));
+}
+
+export interface ModulePageResult {
+  id: string;
+  moduleId: string;
+  moduleTitle: string;
+  pageId: string;
+  pageLabel: string;
+  path: string;
+}
+
+export function searchModulePages(
+  modules: ModuleDescriptor[],
+  query: string,
+): ModulePageResult[] {
+  const tokens = normalizeQuery(query).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  return modules.flatMap((module) => {
+    if (module.id === "homepage") return [];
+    return module.pages.flatMap((page) => {
+      const path = `/${module.id}/${page.path}`;
+      const searchable = `${module.title} ${module.id} ${page.label} ${page.id} ${page.path}`;
+      if (!everyTokenIn(searchable, tokens)) return [];
+      return [{
+        id: `page:${module.id}:${page.id}`,
+        moduleId: module.id,
+        moduleTitle: module.title,
+        pageId: page.id,
+        pageLabel: page.label,
+        path,
+      }];
+    });
+  });
 }
 
 /**
