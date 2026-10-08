@@ -47,7 +47,21 @@ export interface WriteRequest {
   mount: string;
   path: string;
   values: Record<string, SecretData>;
-  confirm?: boolean;
+}
+
+export interface WriteCommand {
+  environment: string;
+  command: string;
+}
+
+export interface WritePreviewResponse {
+  approvalId: string;
+  commands: WriteCommand[];
+  expiresAt: string;
+}
+
+export interface WriteApprovalRequest {
+  approvalId: string;
 }
 
 export interface WriteResponse {

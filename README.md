@@ -8,7 +8,7 @@ Localhost toolbox with a shared UI shell. Modules:
 
 - **[Homepage](src/modules/homepage/README.md)** — First page: collapsible sections of URL shortcuts, plus a starred row above them
 - **[Kubefwd](src/modules/kubefwd/README.md)** — Kubernetes port-forwards, GCP proxy pods, port checker, and cluster/GCP explore
-- **[Steamer](src/modules/steamer/README.md)** — Read-only OpenBao KV comparison with links to make changes in the OpenBao UI
+- **[Steamer](src/modules/steamer/README.md)** — OpenBao KV comparison with changed-value and exact-command write review
 - **[Kickflip](src/modules/kickflip/README.md)** — Tick YAML-configured services, then annotate ExternalSecrets and/or rollout-restart them
 - **[PR Looker](src/modules/prlooker/README.md)** — GitHub PR inbox (review, assigned, authored, mentioned) via `gh`
 
@@ -148,6 +148,6 @@ npx tsx src/cli.ts --import-yaml ~/.kubefwd.yaml
 
 - [Homepage](src/modules/homepage/README.md) — Links board with URL tiles and a starred row. YAML + UI CRUD; confirm deletes only.
 - [Kubefwd](src/modules/kubefwd/README.md) — Services, Proxy, Port Checker, Explore. SQLite only; YAML is `--import-yaml`.
-- [Steamer](src/modules/steamer/README.md) — Read-only Secrets comparison + editable Settings. Secret changes open in OpenBao; settings saves are confirmed. OIDC callback on port `8250`.
+- [Steamer](src/modules/steamer/README.md) — Secrets comparison + writes gated by changed-value review followed by exact `bao` command review. Settings saves are confirmed. OIDC callback on port `8250`.
 - [Kickflip](src/modules/kickflip/README.md) — Services tile grid. File-only YAML; first start seeds the old restarter lists.
 - [PR Looker](src/modules/prlooker/README.md) — Inbox tabs via `gh search prs`. File-only YAML for poll interval and teams.

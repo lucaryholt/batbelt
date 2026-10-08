@@ -6,6 +6,7 @@ import type {
   HealthResponse,
   ListResponse,
   SecretData,
+  WritePreviewResponse,
   WriteResponse,
 } from "./types";
 
@@ -110,11 +111,45 @@ export async function checkExists(
   );
 }
 
-export async function writeSecrets(_input: {
+export async function previewWrite(input: {
   mount: string;
   path: string;
   values: Record<string, SecretData>;
-  confirm?: boolean;
+}): Promise<WritePreviewResponse> {
+  return parseJson(
+    await fetch("/api/steamer/secrets/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function approveWrite(approvalId: string): Promise<WriteResponse> {
+  return parseJson(
+    await fetch("/api/steamer/secrets/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approvalId }),
+    }),
+  );
+}
+
+export async function rejectWrite(approvalId: string): Promise<void> {
+  await parseJson(
+    await fetch("/api/steamer/secrets/reject", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approvalId }),
+    }),
+  );
+}
+
+export async function writeSecrets(input: {
+  mount: string;
+  path: string;
+  values: Record<string, SecretData>;
 }): Promise<WriteResponse> {
-  throw new Error("Secret writes are disabled. Edit this path in the OpenBao UI.");
+  const preview = await previewWrite(input);
+  return approveWrite(preview.approvalId);
 }

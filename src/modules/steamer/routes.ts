@@ -1,4 +1,5 @@
 import { access, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type {
@@ -8,23 +9,53 @@ import type {
   HealthResponse,
   ListResponse,
   WriteRequest,
+  WriteApprovalRequest,
+  WritePreviewResponse,
   WriteResponse,
 } from "./types.js";
 import {
   baoVersion,
+  cleanupPreparedWrite,
+  executePreparedKvPut,
   kvGet,
   kvList,
-  kvPut,
   loginOidc,
+  prepareKvPut,
   redactOutput,
   revokeToken,
   tokenLookup,
+  type PreparedBaoWrite,
 } from "./bao.js";
 import { findEnvironment, loadConfig, saveConfig } from "./config.js";
 import { configFilePath, tokenPath } from "./paths.js";
 import { openInCode } from "../../open-in-code.js";
 
 const loginLocks = new Set<string>();
+const WRITE_APPROVAL_TTL_MS = 5 * 60_000;
+
+interface PendingWrite {
+  expiresAt: number;
+  writes: Array<{
+    environment: Awaited<ReturnType<typeof findEnvironment>>;
+    prepared: PreparedBaoWrite;
+  }>;
+}
+
+const pendingWrites = new Map<string, PendingWrite>();
+
+async function cleanupPending(pending: PendingWrite): Promise<void> {
+  await Promise.all(pending.writes.map(({ prepared }) => cleanupPreparedWrite(prepared)));
+}
+
+async function removeExpiredWrites(now = Date.now()): Promise<void> {
+  const expired = [...pendingWrites.entries()].filter(([, pending]) => pending.expiresAt <= now);
+  await Promise.all(
+    expired.map(async ([id, pending]) => {
+      pendingWrites.delete(id);
+      await cleanupPending(pending);
+    }),
+  );
+}
 
 function mountFor(envMount: string | undefined, override?: string): string {
   const value = (override ?? envMount ?? "secret").trim();
@@ -193,43 +224,92 @@ export function createRoutes(): Hono {
     return c.json({ exists } satisfies ExistsResponse);
   });
 
-  app.post("/secrets", async (c) => {
-    // Keep the write implementation below so it can be restored once the
-    // feature is ready, but enforce read-only behavior at the API boundary.
-    return c.json(
-      { error: "Secret writes are disabled. Edit this path in the OpenBao UI." },
-      403,
-    );
-
+  app.post("/secrets/preview", async (c) => {
     const body = (await c.req.json()) as WriteRequest;
     const path = cleanPath(body.path ?? "");
     const values = body.values ?? {};
     const envNames = Object.keys(values);
     if (!path) return c.json({ error: "path is required" }, 400);
     if (!envNames.length) return c.json({ error: "No environments selected" }, 400);
-    if (!body.confirm) {
-      return c.json({ error: "confirm is required" }, 400);
+    for (const [name, data] of Object.entries(values)) {
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return c.json({ error: `Invalid secret data for ${name}` }, 400);
+      }
+      if (Object.keys(data).some((key) => !key.trim())) {
+        return c.json({ error: `Secret keys cannot be empty for ${name}` }, 400);
+      }
     }
 
     const config = await loadConfig();
-
-    const results: WriteResponse["results"] = {};
-    await Promise.all(
-      envNames.map(async (name) => {
-        const env = config.environments.find((item) => item.name === name);
-        if (!env) {
-          results[name] = { ok: false, error: "Unknown environment" };
-          return;
-        }
-        results[name] = await kvPut(
-          env,
-          mountFor(env.kvMount, body.mount),
-          path,
-          values[name] ?? {},
-        );
-      }),
+    const environments = envNames.map((name) =>
+      config.environments.find((environment) => environment.name === name),
     );
+    const unknown = envNames.filter((_, index) => !environments[index]);
+    if (unknown.length) {
+      return c.json({ error: `Unknown environment: ${unknown.join(", ")}` }, 400);
+    }
+
+    await removeExpiredWrites();
+    const writes: PendingWrite["writes"] = [];
+    try {
+      for (let index = 0; index < envNames.length; index += 1) {
+        const environment = environments[index]!;
+        const prepared = await prepareKvPut(
+          mountFor(environment.kvMount, body.mount),
+          path,
+          values[envNames[index]] ?? {},
+        );
+        writes.push({ environment, prepared });
+      }
+    } catch (error) {
+      await cleanupPending({ writes, expiresAt: 0 });
+      return c.json({ error: (error as Error).message }, 500);
+    }
+
+    const approvalId = randomUUID();
+    const expiresAt = Date.now() + WRITE_APPROVAL_TTL_MS;
+    pendingWrites.set(approvalId, { writes, expiresAt });
+    const response: WritePreviewResponse = {
+      approvalId,
+      expiresAt: new Date(expiresAt).toISOString(),
+      commands: writes.map(({ environment, prepared }) => ({
+        environment: environment.name,
+        command: prepared.command,
+      })),
+    };
+    return c.json(response);
+  });
+
+  app.post("/secrets/approve", async (c) => {
+    await removeExpiredWrites();
+    const body = (await c.req.json()) as WriteApprovalRequest;
+    const pending = pendingWrites.get(body.approvalId);
+    if (!pending) return c.json({ error: "Write approval is missing or expired" }, 404);
+    pendingWrites.delete(body.approvalId);
+    const results: WriteResponse["results"] = {};
+    try {
+      for (const { environment, prepared } of pending.writes) {
+        try {
+          results[environment.name] = await executePreparedKvPut(environment, prepared);
+        } catch (error) {
+          results[environment.name] = { ok: false, error: (error as Error).message };
+        }
+      }
+    } finally {
+      await cleanupPending(pending);
+    }
     return c.json({ results } satisfies WriteResponse);
+  });
+
+  app.post("/secrets/reject", async (c) => {
+    await removeExpiredWrites();
+    const body = (await c.req.json()) as WriteApprovalRequest;
+    const pending = pendingWrites.get(body.approvalId);
+    if (pending) {
+      pendingWrites.delete(body.approvalId);
+      await cleanupPending(pending);
+    }
+    return c.json({ ok: true });
   });
 
   return app;

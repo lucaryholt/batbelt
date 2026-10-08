@@ -1,6 +1,6 @@
 # Steamer
 
-Compare OpenBao KV secrets across environments. Secret writes are disabled in Steamer; each environment has an **Open in OpenBao** link for making changes in the OpenBao UI. Settings remain editable and every settings save asks for confirmation.
+Compare and update OpenBao KV secrets across environments. Every secret write displays the exact `bao kv put` commands and requires explicit approval before any command runs.
 
 UI: `/steamer/secrets`, `/steamer/settings`.
 
@@ -40,19 +40,20 @@ environments:
 3. **Load existing secret** from one environment or all
 4. Use **Search** to filter browse-path names and key rows (case-insensitive). Hidden values are not searched.
 5. Compare values per key: each key is a collapsed row that expands to list every environment’s read-only value vertically (values hidden until revealed). Keys whose values disagree are marked and highlighted.
-6. Use **Open _environment_ in OpenBao** to change the current secret in that environment
+6. Edit values, explicitly add or remove environment-specific keys, select target environments, and choose **Review changes**
+7. Review only the values that will be added, changed, or removed
+8. Continue to inspect every exact `bao kv put` command, then approve the batch or reject it without running anything
+9. Use **Open _environment_ in OpenBao** as an alternative editing path
 
-A banner on the Secrets page states that Steamer is read-only for now.
-
-The client write helper and `POST /api/steamer/secrets` both reject all secret writes. The existing `bao kv put` implementation remains in the code but is unreachable until the feature is ready.
+Writes replace the complete secret in each selected environment. Each environment keeps its own key set: a key missing from one environment stays missing unless it is explicitly added there. Empty strings are values, not removals. Approval covers the displayed batch, but environments are written sequentially and a later failure cannot undo an earlier successful write.
 
 ### Settings
 
 Add name, address, optional namespace / KV mount / OIDC mount and role. **Save settings** opens a confirm list. **Log in** / **Log out** stay one-click. Login streams `bao` output; CLI lines are redacted.
 
-## Disabled write implementation
+## Write approval
 
-The retained implementation uses `bao kv put` with a JSON payload file (`0600`, deleted afterwards). It would replace the entire secret, but the API currently rejects the request before this code runs.
+The first review shows the actual value changes. Continuing creates per-environment JSON payload files with mode `0600`; the second review shows exact commands referencing those files. Steamer keeps command arguments server-side under a single-use approval ID. Approving executes those unchanged arguments without a shell; rejecting deletes the files without running `bao`. Approvals expire after five minutes, and payload files are removed after approval, rejection, or execution failure.
 
 ## Security
 

@@ -1,9 +1,20 @@
 import { useMemo, useState } from "react";
-import type { AppConfig, EnvResult, EnvStatus, SecretData } from "../types";
-import { getSecrets, listSecrets, loginEnv } from "../api";
+import type { AppConfig, EnvResult, EnvStatus, SecretData, WritePreviewResponse } from "../types";
+import { approveWrite, getSecrets, listSecrets, loginEnv, previewWrite, rejectWrite } from "../api";
 import { PathBrowser } from "../components/PathBrowser";
 import { openBaoSecretUrl } from "../lib/openbao-url";
 import { envErrors } from "../lib/paths";
+
+type SecretSets = Record<string, SecretData>;
+type ChangeKind = "added" | "changed" | "removed";
+
+interface SecretChange {
+  environment: string;
+  key: string;
+  kind: ChangeKind;
+  before?: string;
+  after?: string;
+}
 
 function allLoadedKeys(results: Record<string, EnvResult<SecretData>>): string[] {
   const keys = new Set<string>();
@@ -15,9 +26,54 @@ function allLoadedKeys(results: Record<string, EnvResult<SecretData>>): string[]
   return [...keys].sort();
 }
 
-function valuesDiffer(values: Record<string, Record<string, string>>, key: string, envNames: string[]): boolean {
-  const set = new Set(envNames.map((name) => values[key]?.[name] ?? ""));
+function valuesDiffer(drafts: SecretSets, key: string, envNames: string[]): boolean {
+  const set = new Set(
+    envNames.map((name) =>
+      Object.hasOwn(drafts[name] ?? {}, key) ? drafts[name][key] : Symbol.for("missing"),
+    ),
+  );
   return set.size > 1;
+}
+
+function cloneSecretSets(source: SecretSets): SecretSets {
+  return Object.fromEntries(
+    Object.entries(source).map(([name, data]) => [name, { ...data }]),
+  );
+}
+
+export function changesFor(
+  baseline: SecretSets,
+  drafts: SecretSets,
+  envNames: string[],
+): SecretChange[] {
+  const changes: SecretChange[] = [];
+  for (const environment of envNames) {
+    const before = baseline[environment] ?? {};
+    const after = drafts[environment] ?? {};
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    for (const key of [...keys].sort()) {
+      const hadBefore = Object.hasOwn(before, key);
+      const hasAfter = Object.hasOwn(after, key);
+      if (!hadBefore && hasAfter) {
+        changes.push({ environment, key, kind: "added", after: after[key] });
+      } else if (hadBefore && !hasAfter) {
+        changes.push({ environment, key, kind: "removed", before: before[key] });
+      } else if (before[key] !== after[key]) {
+        changes.push({
+          environment,
+          key,
+          kind: "changed",
+          before: before[key],
+          after: after[key],
+        });
+      }
+    }
+  }
+  return changes;
+}
+
+export function changedEnvironments(changes: SecretChange[]): string[] {
+  return [...new Set(changes.map((change) => change.environment))];
 }
 
 export function SecretsPage({
@@ -38,7 +94,8 @@ export function SecretsPage({
   const [mount, setMount] = useState(defaultMount);
   const [path, setPath] = useState("");
   const [keys, setKeys] = useState<string[]>([]);
-  const [values, setValues] = useState<Record<string, Record<string, string>>>({});
+  const [baseline, setBaseline] = useState<SecretSets>({});
+  const [drafts, setDrafts] = useState<SecretSets>({});
   const [loadFrom, setLoadFrom] = useState(envs[0]?.name ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +107,11 @@ export function SecretsPage({
   const [loginLogs, setLoginLogs] = useState<string[]>([]);
   const [loginCurrent, setLoginCurrent] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [selectedEnvs, setSelectedEnvs] = useState<Record<string, boolean>>(
+    Object.fromEntries(envs.map((env) => [env.name, true])),
+  );
+  const [reviewChanges, setReviewChanges] = useState<SecretChange[] | null>(null);
+  const [preview, setPreview] = useState<WritePreviewResponse | null>(null);
 
   const loggedOut = status.filter((env) => !env.loggedIn);
   const loggingIn = loginCurrent !== null;
@@ -60,28 +122,22 @@ export function SecretsPage({
     .map(({ index }) => index);
 
   function applyLoaded(results: Record<string, EnvResult<SecretData>>, envName?: string) {
-    const nextKeys = envName
-      ? Object.keys(results[envName]?.data ?? {})
-      : allLoadedKeys(results);
+    const names = envName ? [envName] : envs.map((env) => env.name);
+    const nextSecrets = Object.fromEntries(
+      names.map((name) => [name, { ...(results[name]?.data ?? {}) }]),
+    );
+    const nextKeys = [...new Set(Object.values(nextSecrets).flatMap(Object.keys))].sort();
     setKeys(nextKeys);
-    setValues((current) => {
-      const next = { ...current };
-      const names = envName ? [envName] : envs.map((env) => env.name);
-      for (const key of nextKeys) {
-        next[key] = { ...(next[key] ?? {}) };
-        for (const name of names) {
-          const data = results[name]?.data;
-          if (data && key in data) next[key][name] = data[key];
-        }
-      }
-      return next;
-    });
+    setBaseline(cloneSecretSets(nextSecrets));
+    setDrafts(cloneSecretSets(nextSecrets));
     setCompareResults(results);
     setRevealed({});
     setRevealAll(false);
   }
 
   async function loadExisting(nextPath = path, envName = loadFrom) {
+    if (preview) await discardPreview();
+    setReviewChanges(null);
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -107,6 +163,8 @@ export function SecretsPage({
   }
 
   async function runBrowseAt(nextPath = path) {
+    if (preview) await discardPreview();
+    setReviewChanges(null);
     setBusy(true);
     setError(null);
     try {
@@ -150,6 +208,81 @@ export function SecretsPage({
     }
   }
 
+  async function discardPreview() {
+    if (!preview) return;
+    const approvalId = preview.approvalId;
+    setPreview(null);
+    try {
+      await rejectWrite(approvalId);
+    } catch {
+      // The server also expires abandoned previews.
+    }
+  }
+
+  function requestWrite() {
+    const selected = envs.filter((env) => selectedEnvs[env.name]);
+    if (!path.trim()) {
+      setError("Path is required.");
+      return;
+    }
+    if (keys.some((key) => !key.trim())) {
+      setError("Secret keys cannot be empty.");
+      return;
+    }
+    if (!selected.length) {
+      setError("Select at least one environment.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    const changes = changesFor(baseline, drafts, selected.map((env) => env.name));
+    if (!changes.length) {
+      setError("There are no changes to review.");
+      return;
+    }
+    setReviewChanges(changes);
+  }
+
+  async function continueToCommands() {
+    if (!reviewChanges) return;
+    const selectedNames = changedEnvironments(reviewChanges);
+    setBusy(true);
+    setError(null);
+    try {
+      const data = Object.fromEntries(
+        selectedNames.map((name) => [name, { ...(drafts[name] ?? {}) }]),
+      );
+      setPreview(await previewWrite({ mount, path, values: data }));
+      setReviewChanges(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function approvePreview() {
+    if (!preview) return;
+    const approvalId = preview.approvalId;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await approveWrite(approvalId);
+      setPreview(null);
+      const failures = Object.entries(response.results)
+        .filter(([, result]) => !result.ok)
+        .map(([name, result]) => `${name}: ${result.error || "write failed"}`);
+      if (failures.length) throw new Error(failures.join(" · "));
+      setMessage(`Wrote secret to ${Object.keys(response.results).join(", ")}.`);
+      await loadExisting(path, "");
+    } catch (err) {
+      setPreview(null);
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!envs.length) {
     return (
       <div className="card">
@@ -166,10 +299,6 @@ export function SecretsPage({
 
   return (
     <div className="stack">
-      <div className="banner warn">
-        Steamer is read-only right now. Writing secrets from here does not work reliably, so it is
-        disabled — use <strong>Open … in OpenBao</strong> to make changes.
-      </div>
       {loggedOut.length > 0 && (
         <div className="banner warn">Not logged in to {loggedOut.map((env) => env.name).join(", ")}.</div>
       )}
@@ -284,16 +413,34 @@ export function SecretsPage({
       )}
 
       <section className="card">
+        <div className="checkbox-row" style={{ marginBottom: 12 }}>
+          {envs.map((env) => (
+            <label key={env.name}>
+              <input
+                type="checkbox"
+                checked={selectedEnvs[env.name] ?? false}
+                onChange={(event) =>
+                  setSelectedEnvs((current) => ({ ...current, [env.name]: event.target.checked }))
+                }
+              />
+              Write {env.name}
+            </label>
+          ))}
+        </div>
         <div className="key-list">
           {visibleIndexes.map((index) => {
             const key = keys[index];
             const open = revealAll || revealed[key] || !key;
-            const rowDiff = key.trim() !== "" && valuesDiffer(values, key, envs.map((env) => env.name));
+            const rowDiff = key.trim() !== "" && valuesDiffer(drafts, key, envs.map((env) => env.name));
+            const changed = envs.some((env) =>
+              changesFor(baseline, drafts, [env.name]).some((change) => change.key === key),
+            );
             return (
               <details key={index} className={rowDiff ? "key-row diff" : "key-row"}>
                 <summary>
                   <code>{key}</code>
                   {rowDiff && <span className="key-diff-mark">differs</span>}
+                  {changed && <span className="key-change-mark">changed</span>}
                   <button
                     className="btn small"
                     onClick={(event) => {
@@ -306,18 +453,60 @@ export function SecretsPage({
                   </button>
                 </summary>
                 <div className="key-envs">
-                  {envs.map((env) => (
-                    <label key={env.name} className="field">
-                      {env.name}
-                      <input
-                        className="mono"
-                        type={open ? "text" : "password"}
-                        value={values[key]?.[env.name] ?? ""}
-                        readOnly
-                        aria-label={`${key} in ${env.name}`}
-                      />
-                    </label>
-                  ))}
+                  {envs.map((env) => {
+                    const present = Object.hasOwn(drafts[env.name] ?? {}, key);
+                    return (
+                      <div key={env.name} className="field">
+                        <span>{env.name}</span>
+                        {present ? (
+                          <div className="st-value-edit">
+                            <input
+                              className="mono"
+                              type={open ? "text" : "password"}
+                              value={drafts[env.name]?.[key] ?? ""}
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [env.name]: {
+                                    ...(current[env.name] ?? {}),
+                                    [key]: event.target.value,
+                                  },
+                                }))
+                              }
+                              aria-label={`${key} in ${env.name}`}
+                            />
+                            <button
+                              className="btn small danger"
+                              onClick={() =>
+                                setDrafts((current) => {
+                                  const data = { ...(current[env.name] ?? {}) };
+                                  delete data[key];
+                                  return { ...current, [env.name]: data };
+                                })
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn small"
+                            onClick={() =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [env.name]: { ...(current[env.name] ?? {}), [key]: "" },
+                              }))
+                            }
+                          >
+                            Add to {env.name}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </details>
             );
@@ -333,7 +522,88 @@ export function SecretsPage({
             Load an existing secret to compare its values.
           </p>
         )}
+        <div className="actions" style={{ marginTop: 12 }}>
+          <button
+            className="btn"
+            onClick={() => {
+              const key = `new-key-${keys.length + 1}`;
+              setKeys((current) => [...current, key]);
+            }}
+          >
+            Add key
+          </button>
+          <button className="btn primary" disabled={busy || loggingIn} onClick={requestWrite}>
+            Review changes
+          </button>
+        </div>
       </section>
+
+      {reviewChanges && (
+        <div className="st-modal-backdrop" role="presentation">
+          <section className="card st-modal" role="dialog" aria-modal="true" aria-labelledby="changes-title">
+            <h2 id="changes-title">Step 1 of 2: Review changed values</h2>
+            <p>Only the following values will change. Missing keys stay missing unless explicitly added.</p>
+            <div className="st-change-list">
+              {envs.map((env) => {
+                const changes = reviewChanges.filter((change) => change.environment === env.name);
+                if (!changes.length) return null;
+                return (
+                  <div key={env.name}>
+                    <strong>{env.name}</strong>
+                    {changes.map((change) => (
+                      <div className="st-change" key={`${change.environment}:${change.key}`}>
+                        <code>{change.key}</code>
+                        <span className="key-diff-mark">{change.kind}</span>
+                        {change.before !== undefined && (
+                          <div><span className="muted">Before</span><pre className="log">{change.before}</pre></div>
+                        )}
+                        {change.after !== undefined && (
+                          <div><span className="muted">After</span><pre className="log">{change.after}</pre></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="actions">
+              <button className="btn" disabled={busy} onClick={() => setReviewChanges(null)}>
+                Back
+              </button>
+              <button className="btn primary" disabled={busy} onClick={() => void continueToCommands()}>
+                Continue to commands
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {preview && (
+        <div className="st-modal-backdrop" role="presentation">
+          <section className="card st-modal" role="dialog" aria-modal="true" aria-labelledby="write-title">
+            <h2 id="write-title">Step 2 of 2: Approve commands</h2>
+            <p>
+              These exact commands will run in order. A later failure cannot undo earlier writes.
+            </p>
+            <div className="st-command-list">
+              {preview.commands.map((item) => (
+                <div key={item.environment}>
+                  <strong>{item.environment}</strong>
+                  <pre className="log">{item.command}</pre>
+                </div>
+              ))}
+            </div>
+            <div className="actions">
+              <button className="btn" disabled={busy} onClick={() => void discardPreview()}>
+                Reject
+              </button>
+              <button className="btn danger" disabled={busy} onClick={() => void approvePreview()}>
+                Approve and run
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

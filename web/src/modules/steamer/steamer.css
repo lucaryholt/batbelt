@@ -125,6 +125,11 @@
   font-size: 11px;
   text-transform: uppercase;
 }
+.steamer-app .key-change-mark {
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+}
 .steamer-app .key-envs {
   display: flex;
   flex-direction: column;
@@ -195,3 +200,54 @@
   padding-left: 18px;
 }
 .steamer-app .confirm-list li { margin: 4px 0; }
+.steamer-app .st-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.7);
+}
+.steamer-app .st-modal {
+  width: min(760px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+.steamer-app .st-modal h2 { margin-top: 0; }
+.steamer-app .st-command-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.steamer-app .st-command-list .log {
+  max-height: none;
+  margin: 6px 0 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.steamer-app .st-value-edit {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.steamer-app .st-value-edit input { flex: 1; min-width: 0; }
+.steamer-app .st-change-list {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+.steamer-app .st-change {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--st-line);
+}
+.steamer-app .st-change > div { grid-column: 1 / -1; }
+.steamer-app .st-change .log {
+  max-height: 140px;
+  margin: 4px 0 0;
+  color: var(--text);
+}

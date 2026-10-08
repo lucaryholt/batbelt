@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmod, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Environment, SecretData } from "./types.js";
@@ -10,6 +10,12 @@ export interface BaoResult {
   code: number;
   stdout: string;
   stderr: string;
+}
+
+export interface PreparedBaoWrite {
+  args: string[];
+  command: string;
+  directory: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -236,39 +242,52 @@ export async function kvList(
   }
 }
 
-export async function kvPut(
-  environment: Environment,
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+export function formatBaoCommand(args: string[]): string {
+  return ["bao", ...args].map(shellQuote).join(" ");
+}
+
+export async function prepareKvPut(
   mount: string,
   path: string,
   data: SecretData,
-): Promise<{ ok: boolean; version?: number; error?: string }> {
-  const dir = await mkdtemp(join(tmpdir(), "bao-helper-"));
-  const file = join(dir, "payload.json");
+): Promise<PreparedBaoWrite> {
+  const directory = await mkdtemp(join(tmpdir(), "batbelt-steamer-"));
+  const file = join(directory, "payload.json");
   try {
     await writeFile(file, JSON.stringify(data), { mode: 0o600 });
     await chmod(file, 0o600);
-    const result = await runBao(environment, [
-      "kv",
-      "put",
-      `-mount=${mount}`,
-      "-format=json",
-      path,
-      `@${file}`,
-    ]);
-    if (!result.ok) {
-      return { ok: false, error: errorMessage(result, "Failed to write secret") };
-    }
-    try {
-      const parsed = parseJson(result.stdout) as {
-        data?: { version?: number };
-      };
-      return { ok: true, version: parsed.data?.version };
-    } catch {
-      return { ok: true };
-    }
-  } finally {
-    await unlink(file).catch(() => undefined);
-    await rm(dir, { recursive: true, force: true });
+    const args = ["kv", "put", `-mount=${mount}`, "-format=json", path, `@${file}`];
+    return { args, command: formatBaoCommand(args), directory };
+  } catch (error) {
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export async function cleanupPreparedWrite(write: PreparedBaoWrite): Promise<void> {
+  await rm(write.directory, { recursive: true, force: true });
+}
+
+export async function executePreparedKvPut(
+  environment: Environment,
+  write: PreparedBaoWrite,
+): Promise<{ ok: boolean; version?: number; error?: string }> {
+  const result = await runBao(environment, write.args);
+  if (!result.ok) {
+    return { ok: false, error: errorMessage(result, "Failed to write secret") };
+  }
+  try {
+    const parsed = parseJson(result.stdout) as {
+      data?: { version?: number };
+    };
+    return { ok: true, version: parsed.data?.version };
+  } catch {
+    return { ok: true };
   }
 }
 
