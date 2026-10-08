@@ -581,6 +581,28 @@ fn handle_menu(app: &AppHandle, id: &str) {
     }
 }
 
+fn is_primary_click_release(event: &TrayIconEvent) -> bool {
+    matches!(
+        event,
+        TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        }
+    )
+}
+
+fn is_secondary_click_press(event: &TrayIconEvent) -> bool {
+    matches!(
+        event,
+        TrayIconEvent::Click {
+            button: MouseButton::Right,
+            button_state: MouseButtonState::Down,
+            ..
+        }
+    )
+}
+
 fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::App("index.html".into()))
         .title("batbelt")
@@ -645,18 +667,16 @@ pub fn run() {
 
             let menu = build_menu(app.handle())?;
             let mut tray = TrayIconBuilder::with_id("tray")
-                .menu(&menu)
                 .icon_as_template(true)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| handle_menu(app, event.id.as_ref()))
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
+                .on_tray_icon_event(move |tray, event| {
+                    if is_primary_click_release(&event) {
                         toggle_popover(tray.app_handle());
+                    } else if is_secondary_click_press(&event) {
+                        let _ = tray.set_menu(Some(menu.clone()));
+                        let _ = tray.with_inner_tray_icon(|tray| tray.show_menu());
+                        let _ = tray.set_menu(None::<Menu<tauri::Wry>>);
                     }
                 });
             match tauri::image::Image::from_bytes(TRAY_ICON) {
@@ -724,6 +744,19 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    fn tray_click(button: MouseButton, button_state: MouseButtonState) -> TrayIconEvent {
+        TrayIconEvent::Click {
+            id: "tray".into(),
+            position: PhysicalPosition::default(),
+            rect: tauri::Rect {
+                position: tauri::Position::Physical(PhysicalPosition::default()),
+                size: tauri::Size::Physical(tauri::PhysicalSize::default()),
+            },
+            button,
+            button_state,
+        }
+    }
+
     #[test]
     fn centers_on_a_monitor_with_a_negative_origin() {
         assert_eq!(
@@ -738,5 +771,45 @@ mod tests {
             top_center_position(PhysicalPosition::new(0, 48), 3024, 2160, 2.0),
             PhysicalPosition::new(432, 64),
         );
+    }
+
+    #[test]
+    fn primary_click_release_toggles_the_popover() {
+        assert!(is_primary_click_release(&tray_click(
+            MouseButton::Left,
+            MouseButtonState::Up,
+        )));
+    }
+
+    #[test]
+    fn primary_press_and_secondary_clicks_do_not_toggle_the_popover() {
+        assert!(!is_primary_click_release(&tray_click(
+            MouseButton::Left,
+            MouseButtonState::Down,
+        )));
+        assert!(!is_primary_click_release(&tray_click(
+            MouseButton::Right,
+            MouseButtonState::Down,
+        )));
+        assert!(!is_primary_click_release(&tray_click(
+            MouseButton::Right,
+            MouseButtonState::Up,
+        )));
+    }
+
+    #[test]
+    fn secondary_click_press_opens_the_menu_once() {
+        assert!(is_secondary_click_press(&tray_click(
+            MouseButton::Right,
+            MouseButtonState::Down,
+        )));
+        assert!(!is_secondary_click_press(&tray_click(
+            MouseButton::Right,
+            MouseButtonState::Up,
+        )));
+        assert!(!is_secondary_click_press(&tray_click(
+            MouseButton::Left,
+            MouseButtonState::Down,
+        )));
     }
 }
